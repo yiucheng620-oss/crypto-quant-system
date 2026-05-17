@@ -1,0 +1,35 @@
+# Data files - too large, skip
+market_data/
+phase1/
+*.npz
+*.db
+*.csv
+*.json
+!package.json
+
+# Logs and cache
+*.log
+*.log.gz
+logs/
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Reports (generated)
+accuracy_reports/
+
+# Secrets
+.env
+*.pem
+credentials/
+
+# OS files
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+
+# IDE
+.vscode/
+.idea/
