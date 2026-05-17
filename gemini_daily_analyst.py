@@ -68,7 +68,7 @@ def get_recent_signals(hours=24):
     return signals
 
 
-def get_recent_accuracy(days=7):
+def get_recent_accuracy(days=14):
     """Get accuracy stats from last N days."""
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
@@ -81,7 +81,7 @@ def get_recent_accuracy(days=7):
         JOIN signals s ON a.signal_id = s.id
         WHERE a.checked_at > ?
         GROUP BY s.indicator, a.horizon, a.market_condition
-        HAVING total >= 3
+        HAVING total >= 2
     """, (cutoff,))
     rows = c.fetchall()
     conn.close()
@@ -192,9 +192,28 @@ def call_gemini(prompt, market_state, signal_list):
     try:
         payload = {
             "model": "gemini-2.5-pro",
-            "messages": [{"role": "user", "content": prompt}],
-            "temperature": 0.4,
-            "max_tokens": 800,
+            "messages": [
+                {
+                    "role": "system",
+                    "content": (
+                        "你係一個數據驅動嘅加密貨幣交易分析師。你嘅分析必須：\n"
+                        "1. 引用實際數據（不可憑空推測）\n"
+                        "2. 先讀數據後判斷（bull/bear/mixed 必須來自市場狀態數據，不可自創）\n"
+                        "3. 如果數據顯示全線 bear，就寫 bear；不可扭曲數據\n"
+                        "4. 保持簡潔但完整 — 每個 section 至少要有 1-2 行實質內容\n"
+                        "5. 不可跳過任何 section\n"
+                        "6. 用繁體中文輸出"
+                    ),
+                },
+                {"role": "user", "content": prompt},
+            ],
+            "temperature": 0.7,
+            "max_tokens": 4096,
+            "extra_body": {
+                "thinking_config": {
+                    "thinking_budget": 512,
+                }
+            },
         }
         r = requests.post(VERTEX_URL, json=payload, timeout=60)
         r.raise_for_status()
@@ -261,7 +280,7 @@ def main():
     # Gather all data
     market = get_market_state()
     signals = get_recent_signals(24)
-    accuracy = get_recent_accuracy(7)
+    accuracy = get_recent_accuracy(14)
     fg = get_fear_greed()
     macro = get_macro_context()
     btc_price = get_btc_price() or 0
