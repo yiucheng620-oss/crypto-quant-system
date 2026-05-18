@@ -308,6 +308,8 @@ Fear & Greed: {fg}
 - 加密貨幣價格（BTC/ETH/SOL）**只喺🩸加密貨幣 section 出現一次**，後面 section 只寫幣名例如「BTC」「SOL」，唔好再重複價錢
 - 用唔同嘅措辭寫每個 section — avoid 公式化語言（例如唔好每次都寫「市場處於恐慌狀態」「現金為王」），用多變嘅表達方式
 - 短期關注要**直接引用上面🌍宏觀背景入面嘅具體 headline + 來源**，例如「CNBC 報導 PPI 升至 6%」，唔好自己歸納模糊總結
+- 🎯建議同📡Signal 要一致：如果某個方向有明確建議（例如 Short bias），就唔好同時建議相反方向嘅操作（例如 Long），保持邏輯一致
+- 短期關注要**至少 2 項**，例如 1 個宏觀 + 1 個技術/價格 catalyst
 - 用 bullet point，唔好太長
 - 建議要 actionable，唔好模稜兩可
 - 唔好講廢話"""
@@ -336,9 +338,10 @@ def call_gemini(prompt, market_state, signal_list):
                         "6. 美股同 crypto 建議要分開寫\n"
                         "7. BTC/ETH/SOL 價格只用喺🩸加密貨幣 section 出現一次，後續 section 只寫幣名\n"
                         "8. 絕不憑空創造數字 — 如果 prompt 冇提供某個數字（例如 PPI），就唔好寫\n"
-                        "9. 短期關注要直接引用宏觀背景嘅具體 headline + 來源（例如 CNBC 報導…）\n"
+                        "9. 短期關注要直接引用宏觀背景嘅具體 headline + 來源（例如 CNBC 報導…），至少 2 項\n"
                         "10. 每個 section 用唔同措辭，避免公式化語言 — 唔好每次都寫「市場恐慌」「現金為王」\n"
-                        "11. 用繁體中文輸出"
+                        "11. 建議要同 Signal 保持一致 — 如果整體方向係 bear/Short，就唔好同時建議 Long 操作\n"
+                        "12. 用繁體中文輸出"
                     ),
                 },
                 {"role": "user", "content": prompt},
