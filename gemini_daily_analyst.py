@@ -305,6 +305,9 @@ Fear & Greed: {fg}
 **嚴格規則：**
 - 所有數字必須直接來自上面提供嘅數據，不可憑空創造任何數字（包括 PPI、CPI、利率等，除非上面宏觀背景有寫）
 - 如果某個數字唔喺數據入面，就唔好寫出嚟
+- 加密貨幣價格（BTC/ETH/SOL）**只喺🩸加密貨幣 section 出現一次**，後面 section 只寫幣名例如「BTC」「SOL」，唔好再重複價錢
+- 用唔同嘅措辭寫每個 section — avoid 公式化語言（例如唔好每次都寫「市場處於恐慌狀態」「現金為王」），用多變嘅表達方式
+- 短期關注要**直接引用上面🌍宏觀背景入面嘅具體 headline + 來源**，例如「CNBC 報導 PPI 升至 6%」，唔好自己歸納模糊總結
 - 用 bullet point，唔好太長
 - 建議要 actionable，唔好模稜兩可
 - 唔好講廢話"""
@@ -331,15 +334,16 @@ def call_gemini(prompt, market_state, signal_list):
                         "4. 保持簡潔但完整 — 每個 section 至少 1-2 行實質內容\n"
                         "5. 不可跳過任何 section\n"
                         "6. 美股同 crypto 建議要分開寫\n"
-                        "7. BTC/ETH/SOL 價格必須用 prompt 入面「Crypto 現價」嘅數字\n"
+                        "7. BTC/ETH/SOL 價格只用喺🩸加密貨幣 section 出現一次，後續 section 只寫幣名\n"
                         "8. 絕不憑空創造數字 — 如果 prompt 冇提供某個數字（例如 PPI），就唔好寫\n"
-                        "9. 短期關注必須具體（日期+事件），唔可以寫通用廢話\n"
-                        "10. 用繁體中文輸出"
+                        "9. 短期關注要直接引用宏觀背景嘅具體 headline + 來源（例如 CNBC 報導…）\n"
+                        "10. 每個 section 用唔同措辭，避免公式化語言 — 唔好每次都寫「市場恐慌」「現金為王」\n"
+                        "11. 用繁體中文輸出"
                     ),
                 },
                 {"role": "user", "content": prompt},
             ],
-            "temperature": 0.7,
+            "temperature": 0.9,
             "max_tokens": 4096,
             "extra_body": {
                 "thinking_config": {
