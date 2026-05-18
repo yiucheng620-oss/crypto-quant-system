@@ -71,9 +71,11 @@ def save_and_append(symbol, df):
         # Ensure index is datetime (handle mixed types from CSV)
         if not pd.api.types.is_datetime64_any_dtype(existing.index):
             existing.index = pd.to_datetime(existing.index, errors='coerce', utc=True)
-        # Ensure timezone-naive for comparison
+        # Normalize both indices to timezone-naive UTC
         if existing.index.tz is not None:
             existing.index = existing.index.tz_localize(None)
+        if df.index.tz is not None:
+            df.index = df.index.tz_localize(None)
         # Only append new rows
         new_rows = df[~df.index.isin(existing.index)]
         if not new_rows.empty:
