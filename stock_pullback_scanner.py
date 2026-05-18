@@ -94,13 +94,15 @@ def rsi_calc(closes, period=14):
 
 def categorize(closes):
     """Categorize a stock: oversold / near support / strong / weak."""
-    if len(closes) < 200:
+    n = len(closes)
+    if n < 50:
         return None
 
     current = closes[-1]
-    ma20 = sma(closes, 20)
-    ma50 = sma(closes, 50)
-    ma200 = sma(closes, 200)
+    # Adaptive periods: use min(N, period) if we don't have full history
+    ma20 = sma(closes, min(20, n))
+    ma50 = sma(closes, min(50, n))
+    ma200 = sma(closes, min(200, n))
     rsi = rsi_calc(closes)
 
     if ma20 is None or ma50 is None or ma200 is None:
@@ -183,7 +185,7 @@ def categorize(closes):
 def main():
     results = {}
     for sym, name in TICKERS.items():
-        closes = fetch(sym)
+        closes = fetch(sym, '1y')
         if closes is None:
             continue
         info = categorize(closes)
