@@ -1,36 +1,27 @@
 #!/usr/bin/env python3
 """
-Gemini Daily Analyst V2 — Unified Market Intelligence
+Gemini Daily Analyst V2.1 — Unified Market Intelligence
 ═══════════════════════════════════════════════════════
-合併 7 個 data source → Gemini 寫一份全市場分析報告
-取代 daily_brief + cross_asset_matrix（已 kill）
-
-Data sources:
-  1. Crypto market state (ADX/bull/bear)
-  2. Crypto signals (7 indicators)
-  3. Signal accuracy (14-day WR)
-  4. Fear & Greed
-  5. 美股價格 + VIX/債息/黃金 (from market_data)
-  6. 跨市場相關性矩陣 (from correlation_matrix)
-  7. 美股回調掃描 (from stock_pullback_scanner)
-  8. 宏觀背景 (from macro_monitor)
+V2.1 改善:
+  1. BTC/ETH/SOL 價格統一用 market_data（唔再用 phase1 NPZ）
+  2. 反 hallucination：禁止憑空創數字，所有數字必須有 source
+  3. Stock scanner diff：只喺有變化時先寫入 prompt
+  4. 短期關注要求具體 catalyst（日期 + 事件）
 
 Cron: 每日 09:00 HKT (01:00 UTC)
 """
 
 import os, sys, json, sqlite3, requests, time
 from datetime import datetime, timezone, timedelta
-from collections import defaultdict
 
 HKT = timezone(timedelta(hours=8))
 DB_PATH = os.path.expanduser("~/workspace/signal_accuracy.db")
-PHASE1_DIR = os.path.expanduser("~/market_data/phase1")
 MKT_DIR = os.path.expanduser("~/market_data")
 VERTEX_URL = "http://localhost:8899/v1/chat/completions"
 
 
 # ═══════════════════════════════════════════
-# 1. CRYPTO DATA (existing, unchanged)
+# 1. CRYPTO DATA
 # ═══════════════════════════════════════════
 
 def get_market_state():
@@ -106,25 +97,26 @@ def get_fear_greed():
     return "N/A"
 
 
-def get_btc_price():
-    try:
-        import numpy as np
-        d = np.load(os.path.join(PHASE1_DIR, "BTC_1h.npz"))
-        return d['close'][-1]
-    except:
-        return None
+def get_crypto_prices():
+    """Get BTC/ETH/SOL prices from market_data (SAME source as stock data)."""
+    summary = get_stock_summary()
+    prices = {}
+    mapping = {"BTC-USD": "BTC", "ETH-USD": "ETH", "SOL-USD": "SOL"}
+    for key, label in mapping.items():
+        info = summary.get(key, {})
+        if "close" in info:
+            prices[label] = {"price": info["close"], "change_pct": info["change_pct"]}
+    return prices
 
 
 # ═══════════════════════════════════════════
-# 2. STOCK MARKET DATA (NEW)
+# 2. STOCK MARKET DATA
 # ═══════════════════════════════════════════
 
 def get_stock_summary():
-    """Read latest market_data summary JSON."""
     today = datetime.now(HKT).strftime("%Y-%m-%d")
     summary_path = os.path.join(MKT_DIR, "daily", today, "_summary.json")
     if not os.path.exists(summary_path):
-        # Try yesterday
         yesterday = (datetime.now(HKT) - timedelta(days=1)).strftime("%Y-%m-%d")
         summary_path = os.path.join(MKT_DIR, "daily", yesterday, "_summary.json")
     if not os.path.exists(summary_path):
@@ -134,7 +126,6 @@ def get_stock_summary():
 
 
 def get_correlation_report():
-    """Read latest correlation report."""
     today = datetime.now(HKT).strftime("%Y-%m-%d")
     corr_path = os.path.join(MKT_DIR, "daily", today, "_correlation_report.txt")
     if not os.path.exists(corr_path):
@@ -144,22 +135,18 @@ def get_correlation_report():
         return ""
     with open(corr_path) as f:
         lines = f.readlines()
-    # Extract key correlations and matrix
     key_lines = []
-    in_matrix = False
     for line in lines:
         if "關鍵相關性" in line or "相關性異常變動" in line or "完整" in line:
             key_lines.append(line.strip())
         if "🟢" in line or "🔴" in line or "🟡" in line:
             key_lines.append(line.strip())
-        if "───" in line and not in_matrix:
-            in_matrix = True
+        if "───" in line:
             key_lines.append("（完整矩陣見下方）")
     return "\n".join(key_lines[:20])
 
 
 def run_stock_scanner():
-    """Run stock pullback scanner and capture output."""
     import subprocess
     scanner_path = os.path.expanduser("~/workspace/stock_pullback_scanner.py")
     if not os.path.exists(scanner_path):
@@ -175,8 +162,46 @@ def run_stock_scanner():
         return ""
 
 
+def get_stock_scanner_diff():
+    """Compare today's scanner output with yesterday's. Return None if no meaningful change."""
+    today_output = run_stock_scanner()
+    if not today_output:
+        return None
+
+    yesterday = (datetime.now(HKT) - timedelta(days=1)).strftime("%Y-%m-%d")
+    cache_path = os.path.join(MKT_DIR, "daily", yesterday, "_stock_scanner_output.txt")
+    if not os.path.exists(cache_path):
+        # No yesterday data → first run, include it
+        return today_output
+
+    with open(cache_path) as f:
+        yesterday_output = f.read().strip()
+
+    # Extract stock symbols from each output
+    import re
+    def extract_symbols(text):
+        return set(re.findall(r'\*\*([A-Z]+)\*\*', text))
+
+    today_syms = extract_symbols(today_output)
+    yesterday_syms = extract_symbols(yesterday_output)
+
+    if today_syms == yesterday_syms:
+        return None  # No change
+
+    return today_output
+
+
+def save_stock_scanner_output(output):
+    """Save today's scanner output for tomorrow's diff."""
+    today = datetime.now(HKT).strftime("%Y-%m-%d")
+    daily_dir = os.path.join(MKT_DIR, "daily", today)
+    os.makedirs(daily_dir, exist_ok=True)
+    cache_path = os.path.join(daily_dir, "_stock_scanner_output.txt")
+    with open(cache_path, "w") as f:
+        f.write(output)
+
+
 def get_macro_context():
-    """Get latest macro monitor output."""
     macro_dir = os.path.expanduser("~/.hermes/cron/output/406f2275189e/")
     if not os.path.exists(macro_dir):
         return ""
@@ -192,29 +217,42 @@ def get_macro_context():
 
 
 # ═══════════════════════════════════════════
-# 3. PROMPT BUILDER (UPGRADED)
+# 3. PROMPT BUILDER
 # ═══════════════════════════════════════════
 
-def build_prompt(market, signals, accuracy, fg, btc_price,
+def build_prompt(market, signals, accuracy, fg, crypto_prices,
                  stock_summary, correlation, stock_scans, macro):
-    """Build comprehensive prompt with all 8 data sources."""
     now = datetime.now(HKT).strftime("%Y-%m-%d %H:%M HKT")
+
+    # Crypto price line (from market_data, same source as stocks)
+    btc = crypto_prices.get("BTC", {})
+    eth = crypto_prices.get("ETH", {})
+    sol = crypto_prices.get("SOL", {})
+    crypto_price_line = (
+        f"BTC ${btc.get('price', 'N/A'):,.0f} ({btc.get('change_pct', 0):+.2f}%)  "
+        f"ETH ${eth.get('price', 'N/A'):,.0f} ({eth.get('change_pct', 0):+.2f}%)  "
+        f"SOL ${sol.get('price', 'N/A'):,.0f} ({sol.get('change_pct', 0):+.2f}%)"
+    )
 
     # Build stock snapshot
     stock_lines = []
     if stock_summary:
         for sym, info in stock_summary.items():
-            if "close" in info:
+            if "close" in info and not sym.endswith("-USD"):  # Exclude crypto (shown above)
                 arrow = "🟢" if info.get("change_pct", 0) > 0 else "🔴"
                 stock_lines.append(
                     f"  {arrow} {info['name']:12s} ${info['close']:>10.2f} {info['change_pct']:+.2f}%"
                 )
-    stock_snapshot = "\n".join(stock_lines[:15]) if stock_lines else "冇美股數據"
+    stock_snapshot = "\n".join(stock_lines[:12]) if stock_lines else "冇美股數據"
+
+    # Scanner: only show if there's a diff (get_stock_scanner_diff already filters)
+    scanner_section = f"## 🎯 美股回調掃描（⚠️ 僅列出變化）\n{stock_scans}" if stock_scans else ""
 
     prompt = f"""你係一個專業全市場交易分析師，覆蓋加密貨幣 + 美股 + 宏觀。請根據以下數據，寫一份每日全市場分析（繁體中文）。
 
 **時間**: {now}
-**BTC 現價**: ${btc_price:,.0f}（如果 N/A = 冇 data）
+**📡 Crypto 現價**（來源：market_data，同美股同一數據源）
+  {crypto_price_line}
 
 ## 🩸 Crypto 市場狀態
 {chr(10).join(market) if market else '冇近期數據'}
@@ -234,8 +272,7 @@ Fear & Greed: {fg}
 ## 🔗 跨市場相關性
 {correlation if correlation else '冇相關性數據'}
 
-## 🎯 美股回調掃描
-{stock_scans if stock_scans else '冇回調 signal'}
+{scanner_section}
 
 ## 🌍 宏觀背景
 {macro if macro else '冇近期 macro data'}
@@ -248,6 +285,7 @@ Fear & Greed: {fg}
 
 **🩸 加密貨幣**
 （一句總結 + 最主要風險 + 支持/阻力位）
+⚠️ BTC/ETH/SOL 價格必須用上面「Crypto 現價」嘅數字，唔好用其他 source
 
 **🇺🇸 美股**
 （一句總結 + AI/半導體焦點 + 回調機會）
@@ -256,19 +294,19 @@ Fear & Greed: {fg}
 （BTC-美股相關性 + 資金流向判斷 + 矛盾/共振）
 
 **📡 今日 Signal**
-（最重要嘅 1-3 個 crypto signal + 1-2 個美股 pullback）
+（最重要嘅 1-3 個 crypto signal + 美股 pullback（如有））
 
 **🎯 今日建議**
 （crypto + 美股 trading 建議，分開寫，注碼建議）
 
 **🔮 短期關注**
-（1-2 個本週 catalyst）
+（1-2 個本週具體 catalyst，必須包含日期/事件名稱，例如「5/20 聯儲局 Waller 講話」而非「留意聯儲局講話」）
 
-格式規則：
+**嚴格規則：**
+- 所有數字必須直接來自上面提供嘅數據，不可憑空創造任何數字（包括 PPI、CPI、利率等，除非上面宏觀背景有寫）
+- 如果某個數字唔喺數據入面，就唔好寫出嚟
 - 用 bullet point，唔好太長
-- 數字要有單位（$ / %），唔好省略
 - 建議要 actionable，唔好模稜兩可
-- 跨市場分析要指出矛盾點（例如 crypto bear 但美股強 = 脫勾風險）
 - 唔好講廢話"""
 
     return prompt
@@ -279,7 +317,6 @@ Fear & Greed: {fg}
 # ═══════════════════════════════════════════
 
 def call_gemini(prompt, market_state, signal_list):
-    """Call Gemini via vertex proxy with fallback."""
     try:
         payload = {
             "model": "gemini-2.5-pro",
@@ -288,13 +325,16 @@ def call_gemini(prompt, market_state, signal_list):
                     "role": "system",
                     "content": (
                         "你係一個數據驅動嘅全市場交易分析師，同時覆蓋加密貨幣同美股。你嘅分析必須：\n"
-                        "1. 引用實際數據（不可憑空推測）\n"
+                        "1. 引用實際數據（不可憑空推測任何數字）\n"
                         "2. 先讀數據後判斷（bull/bear 必須來自數據，不可自創）\n"
                         "3. 跨市場分析要指出矛盾（例如 crypto bear 但美股強）\n"
                         "4. 保持簡潔但完整 — 每個 section 至少 1-2 行實質內容\n"
                         "5. 不可跳過任何 section\n"
                         "6. 美股同 crypto 建議要分開寫\n"
-                        "7. 用繁體中文輸出"
+                        "7. BTC/ETH/SOL 價格必須用 prompt 入面「Crypto 現價」嘅數字\n"
+                        "8. 絕不憑空創造數字 — 如果 prompt 冇提供某個數字（例如 PPI），就唔好寫\n"
+                        "9. 短期關注必須具體（日期+事件），唔可以寫通用廢話\n"
+                        "10. 用繁體中文輸出"
                     ),
                 },
                 {"role": "user", "content": prompt},
@@ -316,8 +356,7 @@ def call_gemini(prompt, market_state, signal_list):
         else:
             raise ValueError("Gemini returned null content")
     except Exception as e:
-        # Fallback
-        btc_price = get_btc_price() or 0
+        btc = get_crypto_prices().get("BTC", {}).get("price", 0)
         now = datetime.now(HKT).strftime('%Y-%m-%d %H:%M HKT')
 
         fallback = [f"📊 **全市場速報** — {now[:10]}"]
@@ -325,16 +364,15 @@ def call_gemini(prompt, market_state, signal_list):
         fallback.append(f"⚠️ Gemini unavailable（{str(e)[:80]}），rule-based fallback：")
         fallback.append("")
 
-        # Crypto
         bear_count = sum(1 for s in market_state if "bear" in s.lower())
         bull_count = sum(1 for s in market_state if "bull" in s.lower())
         fallback.append("**🩸 加密貨幣**")
         if bear_count >= 4:
-            fallback.append(f"  🔴 全線 Bear ({bear_count}/6) → Short bias, BTC=${btc_price:,.0f}")
+            fallback.append(f"  🔴 全線 Bear ({bear_count}/6) → Short bias, BTC=${btc:,.0f}")
         elif bull_count >= 4:
             fallback.append(f"  🟢 全線 Bull ({bull_count}/6) → Long bias")
         else:
-            fallback.append(f"  🟡 Mixed → 觀望")
+            fallback.append("  🟡 Mixed → 觀望")
         fallback.append("")
 
         if signal_list:
@@ -349,8 +387,7 @@ def call_gemini(prompt, market_state, signal_list):
                 fallback.append(f"  {s}")
             fallback.append("")
 
-        fallback.append(f"BTC: ${btc_price:,.0f}" if btc_price else "BTC: N/A")
-
+        fallback.append(f"BTC: ${btc:,.0f}" if btc else "BTC: N/A")
         return "\n".join(fallback)
 
 
@@ -366,15 +403,25 @@ def main():
     signals = get_recent_signals(24)
     accuracy = get_recent_accuracy(14)
     fg = get_fear_greed()
-    btc_price = get_btc_price() or 0
+    crypto_prices = get_crypto_prices()
+    btc_price = crypto_prices.get("BTC", {}).get("price", 0)
     stock_summary = get_stock_summary()
     correlation = get_correlation_report()
-    stock_scans = run_stock_scanner()
+    stock_scans = get_stock_scanner_diff()  # Only if changed vs yesterday
     macro = get_macro_context()
+
+    # Save scanner output for tomorrow's diff
+    if stock_scans:
+        save_stock_scanner_output(stock_scans)
+    else:
+        # Still save today's raw output for diff purposes
+        raw_scans = run_stock_scanner()
+        if raw_scans:
+            save_stock_scanner_output(raw_scans)
 
     # Build prompt + call Gemini
     prompt = build_prompt(
-        market, signals, accuracy, fg, btc_price,
+        market, signals, accuracy, fg, crypto_prices,
         stock_summary, correlation, stock_scans, macro
     )
     analysis = call_gemini(prompt, market, signals)
