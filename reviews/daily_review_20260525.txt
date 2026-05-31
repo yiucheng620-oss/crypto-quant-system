@@ -1,0 +1,44 @@
+# 🔧 每日自動優化報告 — 2026-05-25 20:00 HKT
+
+## 📊 交易統計 (7日)
+- Engines: 4 | Closed: 9 | P&L: $-13.56
+
+## ⚡ 今日自動優化
+- ✅ [btc] `STOP_LOSS_PCT`: 0.05 → 0.06
+  _🚨 WHIPSAW: 全部 1 trades SL out, avg hold 4.7min → SL 明顯太窄，大幅放寬_
+- ✅ [eth] `STOP_LOSS_PCT`: 0.05 → 0.06
+  _🚨 WHIPSAW: 全部 2 trades SL out, avg hold 4.6min → SL 明顯太窄，大幅放寬_
+
+---
+## 🧠 Gemini 3.1 Pro (free) 戰略分析
+
+以下是基於數據的戰略分析報告：
+
+**1. 市場結構變化**
+*   **全市場失去趨勢 (Regime Shift)**：目前市場處於「高雜訊、低動能」的惡劣環境。
+*   **Crypto (BTC/ETH)**：極度Choppy（震盪）。持倉不到5分鐘即被掃SL，說明市場充滿假突破（Whipsaw），短線做空動能極弱。
+*   **TradFi (Gold/Indices)**：動能枯竭。持倉長達1至2.5小時，最終大量觸發 TimeStop（Indices高達75%），說明市場處於死水般的窄幅盤整，缺乏方向性推動。
+
+**2. 跨市場關聯**
+*   **全線敗退 (勝率0%)**：Crypto做空失敗，Indices做多也失敗，顯示無論多空皆無行情。
+*   **資金配置調整**：**必須全面降倉 (De-risk)**。目前不適合任何趨勢跟蹤策略，應將資金撤回現金，直到任何一個市場出現真實的波動率突破 (Volatility Breakout)。
+
+**3. 時間段風險**
+*   **最危險時段**：**ETH 14:00 (HKT)**。這是亞盤尾聲與歐盤早段交接期，容易出現流動性陷阱或反向掃單。
+*   **保護措施**：立即在Engine加入 **Time Filter (時間過濾)**，13:30 - 14:30 期間禁止 ETH 開新倉，或在該時段強制將部位縮減 (Position Sizing) 50% 以上。
+
+**4. 最緊急行動**
+*   **覆寫 Crypto 的止損邏輯並強制降頻**。
+*   *原因*：系統今日自動將 BTC/ETH 的 SL 從 0.05% 放寬到 0.06%。在 Crypto 市場，0.06% 依然是「雜訊級別」的極窄止損，明天大概率會繼續被 Whipsaw 掃出。
+*   *行動*：不要依賴微調 SL。直接暫停 BTC/ETH 的極短線 (Scalping) 策略，或強制要求 ATR (真實波動幅度) 達到特定閾值才允許開倉。
+
+**5. 信心指數 (全線 LOW)**
+*   **BTC (LOW)**：勝率0%，0.06% 的 SL 依然無法過濾市場雜訊，極易再次被掃。
+*   **ETH (LOW)**：勝率0%，且存在 14:00 的時間段盲區，短線做空邏輯目前完全失效。
+*   **Gold (LOW)**：50% TimeStop，多空雙開皆無功而返，市場沒有明確推動力量。
+*   **Indices (LOW)**：75% TimeStop，連續4張多單全部陷入泥沼，做多動能徹底枯竭。 
+
+**總結**：聽日策略應以「防守保本」為主，切勿逆勢扛單或頻繁試錯。等待市場表態。
+
+---
+_參數改動已直接套用到 engine source files。Changelog: /home/yiucheng620/workspace/reviews/param_changelog.json_

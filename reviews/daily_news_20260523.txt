@@ -1,0 +1,7 @@
+📰 *每日新聞簡報* — 2026-05-23
+
+### AI模型新聞
+
+- Google 發表新 AI 模型 Gemini 1.5 Flash，並計劃推出個人化 AI 代理（agents）整合至搜尋引擎，意圖追趕 OpenAI 及 Anthropic。
+- 新模型 Gemini 1.5 Flash 性能接近 Anthropic 旗艦模型，但價格僅為其三分之一，顯示 Google 正以價格優勢搶佔企業市場。
+- 儘管 Google 積極追趕，數據顯示 OpenAI

@@ -1,0 +1,42 @@
+## 🔥 新聞驅動推薦
+
+| TICKER | 方向 | Catalyst | 信心 | 原因 |
+| :--- | :--- | :--- | :--- | :--- |
+| **NVDA** | LONG | Q1財報超預期 + $80B回購 | **HIGH** | 第一季營收達816億美元（年增85%），EPS $1.87超預期。同時宣佈800億美元股份回購，並將季度股息大幅提升至0.25美元。雖然股價因「利好出盡」短期微跌，但Agentic AI（智能體）及推理需求爆發，Vera Rubin晶片出貨在即，短期回調提供極佳的長線逢低買入（Buy the dip）機會。 |
+| **DELL** | LONG | AI伺服器需求強勁，財報前哨戰 | **HIGH** | 週五股價暴漲15%，帶動AI伺服器板塊（HPE +9%, SMCI +5%）。市場預期5月28日公佈的Q1財報將「超預期並上調全年指引」，Polymarket預測其EPS超預期概率高達94%。美銀報告亦看好其AI伺服器積壓訂單與利潤率。 |
+| **EL** | LONG | 終止收購談判，消除M&A不確定性 | **MED** | 股價週五大漲11.9%。公司宣佈不再考慮與西班牙香水巨頭Puig的潛在合併計劃，消除了市場對高溢價收購及整合風險的擔憂，資金重新流入這隻超跌的消費藍籌。 |
+| **WMT** | SHORT | 消費者信心崩塌，利潤率承壓 | **MED** | 密西根大學5月消費者信心指數降至歷史新低（44.8），通膨預期升至4.8%。沃爾瑪此前公佈財報時已警告高油價正壓抑消費者支出。在「美股創新高、庶民信心創新低」的背離下，零售巨頭面臨利潤率收縮風險。 |
+
+---
+
+## ⚠️ 風險警示
+- **避開傳統非必需消費品/零售板塊**：密西根大學消費者信心指數跌至44.8歷史新低，高油價與通膨預期（升至4.8%）正嚴重打擊實體零售及中低收入家庭支出。
+- **避開高Beta能源股（短期）**：美伊和平談判取得進展，霍爾木茲海峽局勢緩和，布蘭特原油已由高位回落至102美元附近。若談判順利，油價將進一步承壓。
+- **債市波動風險**：2年期美債收益率升至15個月新高（4.13%），聯準會會議紀要透露若通膨持續不退不排除升息，高估值非AI科技股或面臨估值修正壓力。
+
+---
+
+## 📊 市場情緒
+- **整體判斷**：**Risk-on（風險偏好強勁）**。美股迎來連續第8週上漲（2023年以來最長連漲紀錄），道指創歷史收盤新高。市場選擇忽視疲弱的宏觀數據（消費者信心），繼續由強勁的企業財報（NVDA、DELL）及美伊地緣政治緩和推動。
+- **最強板塊**：醫療保健（Health Care, +1.19%）、資訊科技（Technology, +1.02%）。
+- **最弱板塊**：通訊服務（Communications, -0.54%）— 為標普500指數中唯一收跌的板塊。
+
+📎 Sources:
+- nvidia.com: https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQHmb1gZaywuuXkFCNZ4u2cW4ITvEpLSx
+- intellectia.ai: https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQGVbSm92RQfAAyMWJujuVSTk7V5z3VG9
+- mufgresearch.com: https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQGTpY3Xs1OPNPL-y8ZpelfOZAjMlc--i
+- youtube.com: https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQGHmDkVATlKPVuA9Z5dlSiFMk0WfjdHZ
+- 247wallst.com: https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQFdULcOhAR3jGYqs5zMSOjYTr7NyLESQ
+
+
+## 📐 Trading Setups
+
+| Ticker | 方向 | Entry | SL | TP | RR | ATR | Trend | 來源 |
+|:--|:--|--:|--:|--:|--:|--:|:--|:--|
+| **NVDA** | LONG | $215.33 | $202.89 | $240.20 | 2.0 | $8.28 | 📈 上升 | YF calc |
+| **DELL** | LONG | $295.19 | $268.53 | $348.50 | 2.0 | $17.76 | 📈 上升 | YF calc |
+| **SMCI** | LONG | $35.58 | $31.73 | $43.29 | 2.0 | $2.57 | 📈 上升 | YF calc |
+| **WMT** | LONG | $120.27 | $115.36 | $130.08 | 2.0 | $3.27 | 📉 下降 | YF calc |
+
+> **Screener** = technical screener 計算 | **YF calc** = 快速 yfinance ATR-based (1.5x SL / 3x TP)
+> ⚠️ YF calc setups 係粗略估算，建議人手確認先落單

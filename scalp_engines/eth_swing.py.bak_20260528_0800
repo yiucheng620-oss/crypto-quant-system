@@ -1,0 +1,830 @@
+#!/usr/bin/env python3
+"""
+⚡ ETH INTRODAY SWING ENGINE — ETH/BTC Ratio Trend + OI Delta 確認
+========================================================================
+繼承 SwingEngine base，專為 ETH 嘅 Intraday Swing 設計。
+核心 Edge: ETH/BTC ratio trend following (大資金轉向有慣性)
+
+策略 (3.1 Pro — ETH Relative Value Pullback):
+  1. ETH/BTC ratio 4hr SMA 向上 → bias LONG only (alt-season)
+  2. OI Delta > 0.5% AND price pullback -1% to -2% from 4hr high → LONG entry
+  3. OI Delta < -1.0% → SHORT only (longs puking)
+  4. VIX fear → reduce position or skip
+
+數據源:
+  - Hyperliquid L2 Order Book (ETH + BTC mid price)
+  - Hyperliquid metaAndAssetCtxs (OI + funding)
+  - OI Delta (15-min window, 持久化到 JSON state)
+  - ETH/BTC ratio 歷史 (1hr window, 持久化到 JSON state)
+  - Capital.com 價格 fallback
+
+用法:
+  from eth_swing import EthSwingEngine
+  engine = EthSwingEngine()
+  result = engine.scan()
+
+Author: Quant Developer
+"""
+
+import json
+import os
+import sys
+import time
+from datetime import datetime, timezone, timedelta
+from typing import Optional, Dict, List, Any
+from statistics import mean
+
+import urllib.request
+import urllib.error
+
+# ==================== 路徑 & 常數 ====================
+
+HKT = timezone(timedelta(hours=8))
+WORKSPACE = os.path.expanduser("~/workspace")
+ENGINES_DIR = os.path.join(WORKSPACE, "scalp_engines")
+LOG_DIR = os.path.join(WORKSPACE, "scalp_lab", "engines")
+os.makedirs(LOG_DIR, exist_ok=True)
+
+sys.path.insert(0, WORKSPACE)
+from scalp_engines.engine_base import SwingEngine, _atomic_save_json, _load_json
+
+HYPERLIQUID_API = "https://api.hyperliquid.xyz/info"
+HTTP_HEADERS = {"Content-Type": "application/json"}
+
+# OI Delta 狀態持久化檔案
+OI_STATE_FILE = os.path.join(LOG_DIR, "eth_oi_delta_state.json")
+# ETH/BTC ratio 歷史持久化檔案
+ETHBTC_HISTORY_FILE = os.path.join(LOG_DIR, "eth_ethbtc_history.json")
+
+
+# ==================== Hyperliquid API Helpers ====================
+
+def _hl_post(payload: Dict) -> Optional[Dict]:
+    """
+    發送 POST 到 Hyperliquid API，全部 try/except 包裹。
+    任何 failure 都 return None 唔會爆 exception。
+    """
+    try:
+        data = json.dumps(payload).encode("utf-8")
+        req = urllib.request.Request(
+            HYPERLIQUID_API,
+            data=data,
+            headers=HTTP_HEADERS,
+            method="POST",
+        )
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            return json.loads(resp.read().decode("utf-8"))
+    except (urllib.error.URLError, urllib.error.HTTPError,
+            json.JSONDecodeError, OSError, TimeoutError) as e:
+        print(f"  ⚠️ Hyperliquid API error ({payload.get('type')}): {e}")
+        return None
+    except Exception as e:
+        print(f"  ⚠️ Hyperliquid unexpected error ({payload.get('type')}): {e}")
+        return None
+
+
+def _get_hl_l2_mid(coin: str) -> Optional[float]:
+    """
+    從 Hyperliquid L2 Order Book 提取 mid price。
+    用最佳 bid 同 ask 嘅中間價。
+    """
+    try:
+        data = _hl_post({"type": "l2Book", "coin": coin})
+        if not data or not isinstance(data, dict):
+            return None
+        levels = data.get("levels")
+        if not levels or not isinstance(levels, list) or len(levels) < 2:
+            return None
+        # Hyperliquid L2: levels[0] = bids, levels[1] = asks
+        bids_data = levels[0]
+        asks_data = levels[1]
+        if not bids_data or not asks_data:
+            return None
+        best_bid = float(bids_data[0]["px"])
+        best_ask = float(asks_data[0]["px"])
+        return round((best_bid + best_ask) / 2.0, 2)
+    except (KeyError, IndexError, TypeError, ValueError) as e:
+        print(f"  ⚠️ HL L2 mid price error ({coin}): {e}")
+        return None
+    except Exception as e:
+        print(f"  ⚠️ HL L2 unexpected error ({coin}): {e}")
+        return None
+
+
+def _get_hl_eth_ctx() -> Optional[Dict]:
+    """
+    從 Hyperliquid metaAndAssetCtxs 拎 ETH 嘅 OI + funding。
+    Return dict: {"open_interest": float, "funding": float}
+    """
+    try:
+        data = _hl_post({"type": "metaAndAssetCtxs"})
+        if not data or not isinstance(data, list) or len(data) < 2:
+            return None
+        meta = data[0]
+        ctxs = data[1]
+        universe = meta.get("universe", [])
+        # 喺 universe 入面搵 ETH 嘅 index
+        for i, asset in enumerate(universe):
+            if asset.get("name") == "ETH" and i < len(ctxs):
+                ctx = ctxs[i]
+                oi = float(ctx.get("openInterest", 0))
+                funding = float(ctx.get("funding", 0))
+                return {"open_interest": oi, "funding": funding}
+        print("  ⚠️ ETH not found in Hyperliquid universe")
+        return None
+    except (KeyError, IndexError, TypeError, ValueError) as e:
+        print(f"  ⚠️ HL metaAndAssetCtxs parse error: {e}")
+        return None
+    except Exception as e:
+        print(f"  ⚠️ HL metaAndAssetCtxs unexpected error: {e}")
+        return None
+
+
+# ==================== OI Delta 管理 (持久化) ====================
+
+def _load_oi_state() -> Dict:
+    """
+    讀取 OI Delta 狀態檔案。
+    如果檔案唔存在或者損壞，回傳預設值。
+    """
+    return _load_json(OI_STATE_FILE, {
+        "prev_oi": 0.0,
+        "prev_timestamp_ts": 0.0,
+        "oi_delta_pct": 0.0,
+        "oi_direction": "neutral",
+    })
+
+
+def _save_oi_state(state: Dict):
+    """
+    原子性寫入 OI Delta 狀態。
+    """
+    _atomic_save_json(OI_STATE_FILE, state)
+
+
+def _update_oi_delta(current_oi: float) -> Dict:
+    """
+    計算 OI Delta (15-min window)。
+    將目前 OI 同上一次 snapshot 比較。
+    如果超過 15 分鐘，更新 snapshot 並計算 delta%。
+    如果未夠 15 分鐘，保持目前 delta 不變。
+
+    Returns:
+        dict: {"oi_delta_pct": float, "oi_direction": str}
+    """
+    state = _load_oi_state()
+    now_ts = time.time()
+    prev_oi = state.get("prev_oi", 0.0)
+    prev_ts = state.get("prev_timestamp_ts", 0.0)
+
+    # 第一次 run，冇 previous snapshot
+    if prev_oi <= 0 or prev_ts <= 0:
+        state["prev_oi"] = current_oi
+        state["prev_timestamp_ts"] = now_ts
+        state["oi_delta_pct"] = 0.0
+        state["oi_direction"] = "neutral"
+        _save_oi_state(state)
+        return {"oi_delta_pct": 0.0, "oi_direction": "neutral"}
+
+    # 計算距離上次 snapshot 嘅時間
+    elapsed = now_ts - prev_ts
+
+    if elapsed >= 900:  # 15 分鐘 = 900 秒
+        # 夠 15 分鐘，用現有 snapshot 計 delta
+        delta_pct = ((current_oi - prev_oi) / max(prev_oi, 1e-8)) * 100.0
+
+        # 決定方向
+        if delta_pct > 0.5:
+            direction = "increasing"
+        elif delta_pct < -0.5:
+            direction = "decreasing"
+        else:
+            direction = "neutral"
+
+        state["prev_oi"] = current_oi
+        state["prev_timestamp_ts"] = now_ts
+        state["oi_delta_pct"] = round(delta_pct, 4)
+        state["oi_direction"] = direction
+        _save_oi_state(state)
+
+        return {"oi_delta_pct": round(delta_pct, 4), "oi_direction": direction}
+    else:
+        # 未夠 15 分鐘，回傳上次計算嘅 delta
+        return {
+            "oi_delta_pct": state.get("oi_delta_pct", 0.0),
+            "oi_direction": state.get("oi_direction", "neutral"),
+        }
+
+
+# ==================== ETH/BTC Ratio History 管理 (持久化) ====================
+
+def _load_ethbtc_history() -> List[Dict]:
+    """
+    讀取 ETH/BTC ratio 歷史。
+    每個 entry: {"timestamp_ts": float, "ratio": float}
+    """
+    return _load_json(ETHBTC_HISTORY_FILE, [])
+
+
+def _save_ethbtc_history(history: List[Dict]):
+    """
+    原子性寫入 ETH/BTC ratio 歷史。
+    """
+    _atomic_save_json(ETHBTC_HISTORY_FILE, history)
+
+
+def _update_ethbtc_history(current_ratio: float) -> Dict:
+    """
+    更新 ETH/BTC ratio 歷史，並計算 trend 指標。
+
+    策略：
+    - 保留最近 1 小時嘅 history (60+ 個 sample)
+    - 對比 current ratio vs 1hr ago ratio
+    - 計算 4hr SMA 方向 (用 history 入面嘅 rolling mean)
+
+    Returns:
+        dict: {
+            "ratio": float,
+            "trend_1hr": str,    # "up"/"down"/"neutral"
+            "trend_4hr_sma": str, # "up"/"down"/"neutral"
+            "sma_4hr": float,
+            "change_1hr_pct": float,
+        }
+    """
+    now_ts = time.time()
+    cutoff_1hr = now_ts - 3600   # 1 小時前
+    cutoff_4hr = now_ts - 14400  # 4 小時前
+
+    history = _load_ethbtc_history()
+
+    # 加入新 entry
+    history.append({"timestamp_ts": now_ts, "ratio": current_ratio})
+
+    # 清理舊 entry (保留最近 4 小時 + buffer)
+    history = [h for h in history if h.get("timestamp_ts", 0) > cutoff_4hr - 300]
+    if len(history) > 500:
+        history = history[-500:]
+
+    _save_ethbtc_history(history)
+
+    result = {
+        "ratio": current_ratio,
+        "trend_1hr": "neutral",
+        "trend_4hr_sma": "neutral",
+        "sma_4hr": current_ratio,
+        "change_1hr_pct": 0.0,
+    }
+
+    # --- 1hr trend: compare current vs 1hr ago ---
+    old_entries = [h for h in history if h["timestamp_ts"] <= cutoff_1hr]
+    if old_entries and len(history) >= 5:
+        # 用最近 3 個嘅 mean vs 1hr 前最近 3 個嘅 mean
+        recent_ratios = [h["ratio"] for h in history[-3:]]
+        old_ratios = [h["ratio"] for h in old_entries[-3:]]
+        recent_mean = mean(recent_ratios)
+        old_mean = mean(old_ratios)
+        change_pct = ((recent_mean - old_mean) / max(old_mean, 1e-8)) * 100.0
+        result["change_1hr_pct"] = round(change_pct, 4)
+
+        if change_pct > 0.3:
+            result["trend_1hr"] = "up"
+        elif change_pct < -0.3:
+            result["trend_1hr"] = "down"
+        else:
+            result["trend_1hr"] = "neutral"
+
+    # --- 4hr SMA 方向 ---
+    # 用目前整個 history 計 SMA (最多 4hr)
+    four_hr_ratios = [h["ratio"] for h in history if h["timestamp_ts"] > cutoff_4hr]
+    if len(four_hr_ratios) >= 10:
+        sma_4hr = mean(four_hr_ratios)
+        result["sma_4hr"] = round(sma_4hr, 6)
+
+        # 比較 current vs 4hr SMA
+        sma_diff_pct = ((current_ratio - sma_4hr) / max(sma_4hr, 1e-8)) * 100.0
+        if sma_diff_pct > 0.2:
+            result["trend_4hr_sma"] = "up"
+        elif sma_diff_pct < -0.2:
+            result["trend_4hr_sma"] = "down"
+        else:
+            result["trend_4hr_sma"] = "neutral"
+
+    return result
+
+
+# ==================== ATR 計算 ====================
+
+def _compute_atr(prices: List[float], period: int = 14) -> float:
+    """
+    簡單 ATR 計算 — 用 high-low range 代替 True Range。
+    因為係 intraday swing，close-to-close 已經足夠。
+
+    Args:
+        prices: 歷史價格列表 (由新到舊)
+        period: ATR 周期 (default: 14)
+
+    Returns:
+        float: ATR 值
+    """
+    if len(prices) < period + 1:
+        return prices[0] * 0.005 if prices else 0  # fallback: 0.5%
+
+    try:
+        # 計算 daily range (|close - previous close| 做 proxy)
+        ranges = []
+        for i in range(len(prices) - 1):
+            r = abs(prices[i] - prices[i + 1])
+            ranges.append(r)
+
+        # Simple moving average of ranges
+        atr = mean(ranges[:period])
+        return round(atr, 4)
+    except (IndexError, TypeError, ValueError) as e:
+        print(f"  ⚠️ ATR compute error: {e}")
+        return prices[0] * 0.005 if prices else 0
+
+
+# ==================== Capital.com Fallback ====================
+
+def _fetch_capital_price(epic: str = "ETHUSD", account_id: str = "") -> Optional[float]:
+    """
+    Capital.com 價格 fallback — 用 market info 拎 mid price。
+    """
+    if not account_id:
+        return None
+    try:
+        from capitalcom_paper import get_market_info
+        info = get_market_info(epic, account_id)
+        if info and isinstance(info, dict):
+            bid = info.get("bid")
+            offer = info.get("offer")
+            if bid and offer:
+                return round((float(bid) + float(offer)) / 2.0, 2)
+            if bid:
+                return float(bid)
+            if offer:
+                return float(offer)
+    except ImportError:
+        print("  ⚠️ capitalcom_paper not available for price fallback")
+    except Exception as e:
+        print(f"  ⚠️ Capital.com price fetch error: {e}")
+    return None
+
+
+def _fetch_capital_ethbtc(account_id: str = "") -> Optional[float]:
+    """
+    Capital.com ETH/BTC ratio fallback (如果 Hyperliquid ratio 失敗)。
+    """
+    if not account_id:
+        return None
+    try:
+        from capitalcom_paper import get_market_info
+        info = get_market_info("ETHBTC", account_id)
+        if info and isinstance(info, dict):
+            bid = info.get("bid")
+            offer = info.get("offer")
+            if bid and offer:
+                return round((float(bid) + float(offer)) / 2.0, 6)
+    except Exception:
+        pass
+    return None
+
+
+# ==================== ETH SWING ENGINE ====================
+
+class EthSwingEngine(SwingEngine):
+
+    # === Engine-specific config params ===
+    STOP_LOSS_ATR_MULT: float = 4.0
+    ATR_PERIOD: int = 14
+
+    def _get_engine_param_map(self) -> dict:
+        return {
+            "stop_loss_atr_mult": "STOP_LOSS_ATR_MULT",
+            "atr_period": "ATR_PERIOD",
+        }
+
+    STOP_LOSS_PCT: float = 0.06  # Auto-optimized by daily_review
+    """
+    ETH Intraday Swing Engine — ETH/BTC Ratio Trend Following + OI Delta Confirmation
+
+    核心 Edge:
+      ETH 嘅 primary edge 係 ETH/BTC ratio（大資金轉向有慣性）。
+      OI Delta 做 confirmation，pullback 入場。
+
+    信號邏輯 (3.1 Pro — ETH Relative Value Pullback):
+      1. ETH/BTC ratio 4hr SMA 向上 → bias LONG only (alt-season)
+      2. OI Delta > 0.5% AND price pullback -1% to -2% from 4hr high → LONG entry
+      3. OI Delta < -1.0% → SHORT only（longs puking）
+      4. Flow context: VIX fear → reduce position or skip
+    """
+
+    MARKET = "ETH"
+    EPIC = "ETHUSD"
+    ACCOUNT_KEY = "crypto"
+
+    # === Swing risk params (overridden from base) ===
+    MAX_POSITIONS = 1
+    MAX_EXPOSURE_PCT = 0.70
+    RISK_PER_TRADE_PCT = 0.02       # 2% of balance per trade
+    STOP_LOSS_ATR_MULT = 2.5        # ATR-based stop loss multiplier
+    TAKE_PROFIT_PCT = 0.03          # 5% TP
+    TRAILING_ACTIVATION_PCT = 0.02  # Start trailing after 2% profit
+    TRAILING_DISTANCE_PCT = 0.015   # Trail 1.5% behind price
+    TIME_STOP_MINUTES = 240         # 4 hours max hold
+    ATR_PERIOD = 14                 # ATR 周期
+
+    def __init__(self, name: str = None):
+        """
+        初始化 ETH Swing Engine。
+        載入持久化狀態 (OI Delta, ETH/BTC history)。
+        """
+        super().__init__(name or "eth")
+        # 價格歷史用嚟計 ATR (跨 scan cycle 持久化)
+        self.price_history: List[float] = []
+        self._load_price_history()
+        print(f"🤖 ETH Swing Engine initialised — account: {self.ACCOUNT_KEY} ({self.account_id})")
+
+    # ==================== 價格歷史持久化 ====================
+
+    def _price_history_path(self) -> str:
+        """價格歷史持久化檔案路徑"""
+        return os.path.join(LOG_DIR, f"{self.name}_price_history.json")
+
+    def _load_price_history(self):
+        """從檔案載入價格歷史"""
+        try:
+            data = _load_json(self._price_history_path(), [])
+            self.price_history = data if isinstance(data, list) else []
+        except Exception as e:
+            print(f"  ⚠️ Load price history error: {e}")
+            self.price_history = []
+
+    def _save_price_history(self):
+        """保存價格歷史到檔案"""
+        try:
+            _atomic_save_json(self._price_history_path(), self.price_history[-100:])
+        except Exception as e:
+            print(f"  ⚠️ Save price history error: {e}")
+
+    # ==================== 數據獲取 ====================
+
+    def get_market_data(self) -> Dict:
+        """
+        收集 ETH 市場數據。
+
+        Returns:
+            dict with keys:
+            - eth_price: ETH mid price (or None)
+            - btc_price: BTC mid price (or None)
+            - ethbtc_ratio: ETH/BTC ratio (or None)
+            - ethbtc_trend: ETH/BTC ratio trend analysis dict
+            - eth_open_interest: ETH OI (or None)
+            - eth_funding: ETH funding rate (or None)
+            - oi_delta: OI Delta analysis dict
+            - capitalcom_price: fallback price (or None)
+            - atr: current ATR value (or fallback)
+            - sources_alive: 成功數據源列表
+            - sources_dead: 失敗數據源列表
+            - timestamp: ISO timestamp
+        """
+        result = {
+            "timestamp": datetime.now(HKT).isoformat(),
+            "eth_price": None,
+            "btc_price": None,
+            "ethbtc_ratio": None,
+            "ethbtc_trend": {
+                "ratio": None, "trend_1hr": "neutral",
+                "trend_4hr_sma": "neutral", "sma_4hr": None,
+                "change_1hr_pct": 0.0,
+            },
+            "eth_open_interest": None,
+            "eth_funding": None,
+            "oi_delta": {"oi_delta_pct": 0.0, "oi_direction": "neutral"},
+            "capitalcom_price": None,
+            "atr": 0.0,
+            "sources_alive": [],
+            "sources_dead": [],
+        }
+
+        # ---- 1. Hyperliquid ETH L2 mid price ----
+        try:
+            eth_price = _get_hl_l2_mid("ETH")
+            if eth_price and eth_price > 0:
+                result["eth_price"] = eth_price
+                result["sources_alive"].append("hl_eth_l2")
+            else:
+                result["sources_dead"].append("hl_eth_l2")
+        except Exception as e:
+            print(f"  ⚠️ get_market_data: HL ETH L2 exception: {e}")
+            result["sources_dead"].append("hl_eth_l2")
+
+        # ---- 2. Hyperliquid BTC L2 mid price (for ETH/BTC ratio) ----
+        try:
+            btc_price = _get_hl_l2_mid("BTC")
+            if btc_price and btc_price > 0:
+                result["btc_price"] = btc_price
+                result["sources_alive"].append("hl_btc_l2")
+
+                # 計算 ETH/BTC ratio
+                if result["eth_price"] and result["eth_price"] > 0:
+                    ethbtc_ratio = result["eth_price"] / btc_price
+                    result["ethbtc_ratio"] = round(ethbtc_ratio, 6)
+                    result["sources_alive"].append("hl_ethbtc_ratio")
+
+                    # 更新 ETH/BTC history + trend
+                    trend = _update_ethbtc_history(ethbtc_ratio)
+                    result["ethbtc_trend"] = trend
+
+            else:
+                result["sources_dead"].append("hl_btc_l2")
+        except Exception as e:
+            print(f"  ⚠️ get_market_data: HL BTC L2 exception: {e}")
+            result["sources_dead"].append("hl_btc_l2")
+
+        # ---- 3. Hyperliquid ETH OI + funding ----
+        try:
+            eth_ctx = _get_hl_eth_ctx()
+            if eth_ctx:
+                result["eth_open_interest"] = eth_ctx.get("open_interest")
+                result["eth_funding"] = eth_ctx.get("funding")
+                result["sources_alive"].append("hl_eth_ctx")
+
+                # OI Delta 計算
+                if result["eth_open_interest"] and result["eth_open_interest"] > 0:
+                    oi_delta = _update_oi_delta(result["eth_open_interest"])
+                    result["oi_delta"] = oi_delta
+            else:
+                result["sources_dead"].append("hl_eth_ctx")
+        except Exception as e:
+            print(f"  ⚠️ get_market_data: HL ETH ctx exception: {e}")
+            result["sources_dead"].append("hl_eth_ctx")
+
+        # ---- 4. Capital.com fallback ----
+        # 如果 ETH/BTC ratio 仲係 None，試 Capital.com
+        if result["ethbtc_ratio"] is None or result["eth_price"] is None:
+            try:
+                # Fallback: 直接拎 ETH price
+                if result["eth_price"] is None:
+                    cc_eth = _fetch_capital_price("ETHUSD", self.account_id)
+                    if cc_eth:
+                        result["capitalcom_price"] = cc_eth
+                        result["eth_price"] = cc_eth
+                        result["sources_alive"].append("capital_eth")
+
+                # Fallback: ETH/BTC ratio
+                if result["ethbtc_ratio"] is None:
+                    cc_ethbtc = _fetch_capital_ethbtc(self.account_id)
+                    if cc_ethbtc:
+                        result["ethbtc_ratio"] = cc_ethbtc
+                        result["sources_alive"].append("capital_ethbtc")
+
+                        # 用 Capital.com ratio 更新 trend
+                        trend = _update_ethbtc_history(cc_ethbtc)
+                        result["ethbtc_trend"] = trend
+            except Exception as e:
+                print(f"  ⚠️ get_market_data: Capital.com fallback exception: {e}")
+                result["sources_dead"].append("capital_fallback")
+
+        # ---- 5. ATR 計算 ----
+        if result["eth_price"] and result["eth_price"] > 0:
+            self.price_history.insert(0, result["eth_price"])
+            # 保留最近 100 個價格點
+            if len(self.price_history) > 100:
+                self.price_history = self.price_history[:100]
+            self._save_price_history()
+
+            result["atr"] = _compute_atr(self.price_history, self.ATR_PERIOD)
+        else:
+            # fallback ATR: 0.5% of last known price
+            last_price = self.price_history[0] if self.price_history else 2000
+            result["atr"] = round(last_price * 0.005, 4)
+
+        # ---- Summary ----
+        alive = len(result["sources_alive"])
+        dead = len(result["sources_dead"])
+        print(f"📡 ETH Swing market data — {alive} alive, {dead} dead, "
+              f"ETH=${result['eth_price']}, BTC=${result['btc_price']}, "
+              f"ETH/BTC={result['ethbtc_ratio']}, OI delta={result['oi_delta']['oi_delta_pct']:.2f}%")
+
+        return result
+
+    # ==================== Flow Bias Interpretation ====================
+
+    def interpret_flow_bias(self, flow_data: Dict) -> Dict:
+        """
+        解讀跨市場資金流向，調整 ETH 嘅方向 bias。
+
+        邏輯:
+        - VIX fear (>= 30) → SHORT bias (crypto 同 risk assets 一齊跌)
+        - 但如果 ETH/BTC ratio trend 明顯向上，可以 override flow bias
+
+        Args:
+            flow_data: flow_monitor 嘅原始數據
+
+        Returns:
+            dict: {"LONG": int, "SHORT": int} — 正數代表 bias 強度
+        """
+        bias = {"LONG": 0, "SHORT": 0}
+
+        try:
+            vix = flow_data.get("vix", 0)
+            vix_regime = flow_data.get("vix_regime", "unknown")
+
+            # VIX fear → SHORT bias
+            if vix_regime == "fear" or vix >= 30:
+                bias["SHORT"] += 2
+                print(f"  🌊 Flow: VIX={vix:.1f} (fear) → SHORT bias +2")
+
+            # VIX elevated → reduce risk
+            if vix_regime == "high" or (25 <= vix < 30):
+                bias["SHORT"] += 1
+                print(f"  🌊 Flow: VIX={vix:.1f} (high) → SHORT bias +1")
+
+            # VIX low/complacency → 中性，冇 bias
+            if vix_regime == "complacency" or vix < 15:
+                print(f"  🌊 Flow: VIX={vix:.1f} (complacency) → neutral")
+
+        except Exception as e:
+            print(f"  ⚠️ interpret_flow_bias error: {e}")
+
+        return bias
+
+    # ==================== 信號生成 ====================
+
+    def generate_signal(self, data: Dict) -> Optional[Dict]:
+        """
+        信號邏輯 (3.1 Pro — ETH Relative Value Pullback):
+
+        1. ETH/BTC ratio 4hr SMA 向上 → bias LONG only (alt-season 確認)
+           * 只有當時 trend 明確向上先做 LONG
+        2. OI Delta > 0.5% AND price pullback -1% to -2% from local high → LONG entry
+           * OI 增加 + 價格回調 = 聰明錢累積
+        3. OI Delta < -1.0% → SHORT only（longs puking）
+        4. Flow context: VIX fear → reduce position / skip
+
+        Args:
+            data: get_market_data() 嘅回傳值
+
+        Returns:
+            signal dict 或 None（唔符合條件）
+        """
+        # === 前置檢查：必須有 ETH 價格 ===
+        price = data.get("eth_price")
+        if not price or price <= 0:
+            print("  ❌ No valid ETH price — cannot generate signal")
+            return None
+
+        ethbtc_trend = data.get("ethbtc_trend", {})
+        oi_delta = data.get("oi_delta", {"oi_delta_pct": 0.0, "oi_direction": "neutral"})
+        flow_ctx = data.get("_flow", {})
+        atr = data.get("atr", price * 0.005)
+
+        # Extract flow bias
+        flow_bias = flow_ctx.get("bias_adjustment", {"LONG": 0, "SHORT": 0})
+        vix = flow_ctx.get("vix", 0)
+        vix_regime = flow_ctx.get("vix_regime", "unknown")
+        flow_signals = flow_ctx.get("flow_signals", [])
+
+        # ETH/BTC ratio 指標
+        trend_4hr_sma = ethbtc_trend.get("trend_4hr_sma", "neutral")
+        trend_1hr = ethbtc_trend.get("trend_1hr", "neutral")
+        sma_4hr = ethbtc_trend.get("sma_4hr", None)
+        ratio_change_1hr = ethbtc_trend.get("change_1hr_pct", 0.0)
+
+        print(f"  📊 Signal check: price={price} | ETH/BTC trend_4hr={trend_4hr_sma} "
+              f"1hr={trend_1hr} ({ratio_change_1hr:+.2f}%) "
+              f"| OI delta={oi_delta['oi_delta_pct']:+.2f}% ({oi_delta['oi_direction']}) "
+              f"| VIX={vix} ({vix_regime})"
+              f" | ATR={atr:.2f}")
+
+        direction = None
+        reason_parts = []
+
+        # === VIX Fear Check — Reduce or Skip ===
+        vix_fear = (vix_regime == "fear" or vix >= 30)
+        if vix_fear:
+            print(f"  ⚠️ VIX fear regime ({vix:.1f}) — reducing conviction")
+            # 如果 VIX fear，SHORT bias 來自 flow context
+            # 但 ETH/BTC ratio 可以 override
+
+        net_flow_bias = flow_bias.get("SHORT", 0) - flow_bias.get("LONG", 0)
+
+        # Initialize edge weights
+        oi_edge_weight = self.edge_weights.get("oi_delta", 1.0)
+
+        # ===============================================================
+        # 策略 1: ETH/BTC ratio 4hr SMA 向上 → bias LONG only
+        # ===============================================================
+        ratio_edge_weight = self.edge_weights.get("ethbtc_ratio", 1.0)
+        if ratio_edge_weight >= 0.1 and trend_4hr_sma == "up":
+            print(f"  ✅ ETH/BTC 4hr SMA 向上 — alt-season 模式")
+            reason_parts.append("ethbtc_sma4h_up")
+
+            # 檢查 OI Delta: > 0.5% = OI 增加 + price pullback → LONG entry
+            oi_delta_pct = oi_delta.get("oi_delta_pct", 0.0)
+            oi_dir = oi_delta.get("oi_direction", "neutral")
+            oi_edge_weight = self.edge_weights.get("oi_delta", 1.0)
+
+            if oi_edge_weight >= 0.1 and oi_dir == "increasing" and oi_delta_pct > 0.5:
+                # OI 增加 → 資金流入
+                # 價格回調 check：比較 current price vs local high
+                # 用 price history 嚟睇 short-term pullback
+                local_high = max(self.price_history[:20]) if len(self.price_history) >= 5 else price
+                pullback_pct = ((price - local_high) / max(local_high, 1e-8)) * 100.0
+
+                print(f"  📈 OI delta={oi_delta_pct:+.2f}% (増加), pullback={pullback_pct:+.2f}% from high={local_high}")
+
+                # Pullback -1% to -2% from local high
+                if -2.0 <= pullback_pct <= -1.0:
+                    # VIX fear 時降低倉位，但唔 skip
+                    if vix_fear:
+                        print(f"  ⚠️ VIX fear — reducing for pullback entry")
+                        reason_parts.append("vix_fear_reduced")
+
+                    direction = "LONG"
+                    reason_parts.append(f"oi_delta_{oi_delta_pct:+.2f}%")
+                    reason_parts.append(f"pullback_{pullback_pct:+.2f}%")
+                else:
+                    print(f"  ⏸️ Pullback {pullback_pct:+.2f}% 唔喺 -1%~-2% 範圍")
+                    # OI 增加但冇 pullback → 等更好入場點
+                    return None
+            else:
+                print(f"  ⏸️ OI delta={oi_delta_pct:+.2f}% — 唔夠 0.5% (需要 OI 增加確認)")
+                return None
+
+        # ===============================================================
+        # 策略 2: OI Delta < -1.0% → SHORT only (longs puking)
+        # ===============================================================
+        elif oi_edge_weight >= 0.1 and oi_delta.get("oi_direction") == "decreasing" and oi_delta.get("oi_delta_pct", 0) < -1.0:
+            oi_delta_pct = oi_delta["oi_delta_pct"]
+            print(f"  📉 OI delta={oi_delta_pct:+.2f}% (longs puking) → SHORT")
+            direction = "SHORT"
+            reason_parts.append(f"oi_puking_{oi_delta_pct:+.2f}%")
+
+            # VIX fear 增加 SHORT confidence
+            if vix_fear:
+                reason_parts.append("vix_fear_confirm")
+
+        # ===============================================================
+        # 策略 3: 純 trend 跟隨但冇 OI 確認 → no trade
+        # ===============================================================
+        else:
+            print(f"  ⏸️ 無符合條件 — ETH/BTC trend={trend_4hr_sma}, "
+                  f"OI delta={oi_delta['oi_delta_pct']:+.2f}%")
+            return None
+
+        # === Check flow bias: VIX fear → SHORT only (除非 ETH/BTC ratio 向上) ===
+        if vix_fear and direction == "LONG" and net_flow_bias >= 2:
+            # VIX fear 但 ETH/BTC ratio 向上，flow bias can be overridden
+            print(f"  ⚠️ VIX fear + flow SHORT bias ({net_flow_bias}) — "
+                  f"ETH/BTC ratio 向上 override")
+            reason_parts.append("flow_override_ethbtc_up")
+        elif vix_fear and direction == "SHORT" and net_flow_bias <= -2:
+            # VIX fear + SHORT bias 一致 → 增加信心
+            reason_parts.append("flow_confirm_short")
+
+        # === 計算 SL/TP ===
+        if direction == "LONG":
+            entry = price
+            stop_loss_atr = round(price - (atr * self.STOP_LOSS_ATR_MULT), 2)
+            target = round(price * (1 + self.TAKE_PROFIT_PCT), 2)
+        else:
+            entry = price
+            stop_loss_atr = round(price + (atr * self.STOP_LOSS_ATR_MULT), 2)
+            target = round(price * (1 - self.TAKE_PROFIT_PCT), 2)
+
+        # 確保 SL/TP 合理
+        if direction == "LONG" and stop_loss_atr >= entry:
+            stop_loss_atr = round(entry * 0.98, 2)
+        elif direction == "SHORT" and stop_loss_atr <= entry:
+            stop_loss_atr = round(entry * 1.02, 2)
+
+        reason = " | ".join(reason_parts)
+        strategy = "eth_swing_relative_value"
+
+        signal = {
+            "strategy": strategy,
+            "epic": self.EPIC,
+            "label": self.MARKET,
+            "direction": direction,
+            "entry": entry,
+            "stop": stop_loss_atr,
+            "target": target,
+            "reason": reason,
+        }
+
+        print(f"  📈 ETH Swing Signal: {direction} @ {entry} "
+              f"| SL={stop_loss_atr} (ATR*{self.STOP_LOSS_ATR_MULT}) "
+              f"| TP={target} | {reason}")
+
+        return signal
+
+
+# ==================== 快速測試 ====================
+
+if __name__ == "__main__":
+    engine = EthSwingEngine()
+    result = engine.scan()
+    print("\n=== Scan Result ===")
+    print(json.dumps(result, indent=2, default=str))

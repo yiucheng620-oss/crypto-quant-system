@@ -1,0 +1,50 @@
+作為量化戰略分析師，睇完你份報告，我嘅結論係：**你個系統而家係「盲飛」加「醉駕」狀態**。Equities引擎未經回測就上馬，仲要連基本嘅倉位管理同P&L計算都壞埋。
+
+以下係針對你3條問題嘅深度戰略分析同執行指令：
+
+### 問題1：呢個系統最大嘅結構性問題係咩？
+
+呢個系統有兩個最致命嘅結構性問題（一文一武）：
+
+1. **系統失明（State Management & P&L Tracking 徹底崩潰）**
+   * **點解致命：** 系統顯示23個「過期未清理」嘅幽靈倉位（Ghost Positions），加上已平倉P&L顯示為$0。量化系統嘅Position Sizing（倉位控制）同Risk Management（風險管理）係100%依賴實時Equity Curve同可用資金去計數。系統連自己贏緊定輸緊、有幾多錢、揸緊咩倉都唔知，下一個Signal出嚟嗰陣，佢根本計唔到正確嘅Order Size，隨時會Over-leverage（過度槓桿）或者射空炮。
+2. **假分散，真重倉（缺乏Correlation Filter）**
+   * **點解致命：** 星期五晚短短半個鐘內，連開5隻半導體（AMD, AMAT, MRVL, LRCX, INTC）。呢個唔係5個獨立交易，而係**單一一個極高Beta嘅SOXX/SMH（半導體指數）重倉賭注**。系統嘅Signal Generation完全冇考慮資產相關性（Correlation），將原本應該係1% Risk嘅Trade，放大咗做5% Risk嘅單一板塊押注。
+
+---
+
+### 問題2：星期一開市前，最應該做嘅3件事係咩？（按緊急程度排序）
+
+**第一急：拆解半導體「火燒連環船」風險（開市即做）**
+* **點做：** 星期一美股一開市（或者Pre-market），**立刻人手斬走最弱嘅3隻半導體長倉**（例如睇Chart邊隻跌穿重要Support就斬邊隻），只保留最強嘅1-2隻。
+* **原因：** 5隻半導體全部蝕緊，如果星期一納指/半導體板塊裂口低開，你個Equities賬戶會食正一波巨大Drawdown。必須強行將Sector Exposure降返去合理水平。
+
+**第二急：調整Crypto短倉止損 / 直接止賺（週末/即刻做）**
+* **點做：** 既然ETH同BTC短倉而家賺緊，而0.5-0.9%嘅Stop Loss喺Crypto週末流動性低嘅時候極容易被Noise掃走（Whipsaw）。你有兩個選擇：一係**直接Take Profit（平倉一半）**將利潤落袋；二係將Stop Loss拉闊到結構性阻力位之上，同時將Trailing Stop推去Breakeven（打和點）。
+* **原因：** 防禦週末Gap Risk，保住Crypto賬戶+11.75%嘅利潤，唔好畀贏緊嘅Trade變輸。
+
+**第三急：Hard Reset系統狀態庫（Database Sync）（開市前必須搞掂）**
+* **點做：** 暫停系統自動開新倉功能（Kill Switch）。寫一個Script或者人手清空系統Database入面嗰23個「幽靈倉位」，然後Call Broker API（例如Interactive Brokers / Binance API），強制將系統嘅Position State同Account Balance同Broker嘅**真實狀態進行1:1 Sync（同步）**。
+* **原因：** 解決「系統失明」問題。未修復P&L Bug同清走Ghost Positions之前，絕對唔可以畀系統行自動落盤，否則錯上加錯。
+
+---
+
+### 問題3：如果只可以改一個嘢去提升下星期表現，改咩？
+
+**改呢樣：加入「板塊曝露上限（Sector/Correlation Exposure Limit）」硬規則**
+
+* **具體講改咩：** 喺Order Execution Logic（落盤邏輯）加一層Filter。當系統出Signal想買入一隻股票時，必須先Check現有Portfolio。
+* **點樣改（Pseudo-code 邏輯）：**
+  ```python
+  MAX_POSITIONS_PER_SECTOR = 1  # 每個板塊最多只可以有1個Open Position
+
+  def can_open_trade(new_ticker):
+      new_ticker_sector = get_sector(new_ticker) # 例如 AMD -> Semiconductor
+      current_sectors = [get_sector(pos.ticker) for pos in open_positions]
+      
+      if new_ticker_sector in current_sectors:
+          return False # 已經有半導體倉，Block咗呢個Trade
+      return True
+  ```
+* **改完預期效果：** 
+  徹底杜絕「半個鐘內買5隻半導體」呢種自殺式行為。當系統再遇到大市單邊市、所有同板塊股票一齊出Signal嗰陣，佢只會揀最先觸發（或者最強）嘅1隻去買。咁樣可以**強制系統做到真正嘅分散投資**，大幅降低單一板塊回調帶嚟嘅Max Drawdown，令Equities引擎喺未有足夠Backtest數據支撐下，都唔會一波流爆倉。

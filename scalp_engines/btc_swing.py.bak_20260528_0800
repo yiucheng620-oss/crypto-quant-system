@@ -1,0 +1,756 @@
+#!/usr/bin/env python3
+"""
+⚡ BTC SWING ENGINE — OI Delta 做主 Edge，ATR SL，Flow Bias Hook，4hr Time Stop
+===============================================================================
+繼承 SwingEngine base，專為 BTC Intraday Swing 設計：
+
+核心改變（vs Scalp）：
+  - 放棄 OB Imbalance + CVD（5-min snapshot 對 swing 冇 predictive power）
+  - OI Delta（15-min window）做 primary edge source
+  - ATR-based dynamic SL（唔係 fixed %）
+  - 4hr time stop（base class 已有）
+  - interpret_flow_bias() hook：VIX fear → SHORT bias for crypto
+
+Signal Logic (priority order):
+  1. OI Delta + Price: OI delta > 0.5% AND price up → LONG
+  2. OI Delta + Price: OI delta < -1.0% AND price down → SHORT
+  3. Funding extreme: funding > 0.03% → SHORT bias; funding < -0.03% → LONG bias
+  4. Flow context: VIX fear → reinforce SHORT
+
+用法：
+  from btc_swing import BtcSwingEngine
+  engine = BtcSwingEngine()
+  result = engine.scan()
+"""
+
+import json
+import os
+import time
+import urllib.request
+import urllib.error
+from datetime import datetime, timezone, timedelta
+from typing import Optional, Dict, List
+
+from engine_base import SwingEngine
+
+# ==================== 常數 ====================
+
+HKT = timezone(timedelta(hours=8))
+WORKSPACE = os.path.expanduser("~/workspace")
+
+# Hyperliquid API
+HL_API = "https://api.hyperliquid.xyz/info"
+
+# Binance public API（用嚟拎 OHLC 計 ATR，唔需要 API key）
+BINANCE_API = "https://api.binance.com/api/v3/klines"
+
+# OI Delta 狀態檔案（持久化跨 cron run）
+OI_STATE_FILE = os.path.join(WORKSPACE, "scalp_lab", "engines", "btc_oi_state.json")
+
+
+# ==================== Hyperliquid Helpers ====================
+
+
+def _hl_post(payload: dict, timeout: int = 10) -> Optional[Dict]:
+    """
+    發送 POST 到 Hyperliquid API。
+    任何 failure return None，唔爆 exception。
+    """
+    try:
+        data = json.dumps(payload).encode("utf-8")
+        req = urllib.request.Request(
+            HL_API,
+            data=data,
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            return json.loads(resp.read().decode("utf-8"))
+    except (urllib.error.URLError, urllib.error.HTTPError,
+            json.JSONDecodeError, OSError, TimeoutError) as e:
+        print(f"⚠️ [BTC-SWING] Hyperliquid API error ({payload.get('type')}): {e}")
+    except Exception as e:
+        print(f"⚠️ [BTC-SWING] HL unexpected error ({payload.get('type')}): {e}")
+    return None
+
+
+def _get_hl_l2_book() -> Optional[Dict]:
+    """
+    從 Hyperliquid 拎 BTC L2 Order Book。
+    Return: {"bids": [(px, sz), ...], "asks": [(px, sz), ...]} 或 None
+    """
+    data = _hl_post({"type": "l2Book", "coin": "BTC"})
+    if not data:
+        return None
+    try:
+        levels = data.get("levels", [[], []])
+        bids_data = levels[0] if len(levels) > 0 else []
+        asks_data = levels[1] if len(levels) > 1 else []
+        bids = [(float(b["px"]), float(b["sz"])) for b in bids_data if "px" in b and "sz" in b]
+        asks = [(float(a["px"]), float(a["sz"])) for a in asks_data if "px" in a and "sz" in a]
+        return {"bids": bids, "asks": asks}
+    except (KeyError, IndexError, TypeError, ValueError) as e:
+        print(f"⚠️ [BTC-SWING] HL L2 parse error: {e}")
+        return None
+
+
+def _get_hl_mid_price(l2_book: Dict) -> Optional[float]:
+    """從 L2 book 拎 mid price (best bid + best ask / 2)。"""
+    try:
+        bids = l2_book.get("bids", [])
+        asks = l2_book.get("asks", [])
+        if bids and asks:
+            return round((bids[0][0] + asks[0][0]) / 2.0, 2)
+    except (IndexError, TypeError, ValueError) as e:
+        print(f"⚠️ [BTC-SWING] HL mid price parse error: {e}")
+    return None
+
+
+def _get_hl_meta_and_ctxs() -> Optional[Dict]:
+    """
+    從 Hyperliquid 拎 metadata + asset contexts。
+    Return dict with 'universe' + 'assetCtxs'，或 None。
+    """
+    raw = _hl_post({"type": "metaAndAssetCtxs"})
+    if raw is None:
+        return None
+    try:
+        if not isinstance(raw, list) or len(raw) < 2:
+            return None
+        meta_part = raw[0]
+        ctxs_part = raw[1]
+        return {
+            "universe": meta_part.get("universe", []),
+            "assetCtxs": ctxs_part if isinstance(ctxs_part, list) else [],
+        }
+    except (KeyError, IndexError, TypeError) as e:
+        print(f"⚠️ [BTC-SWING] HL meta parse error: {e}")
+        return None
+
+
+# ==================== Capital.com Price Fallback ====================
+
+
+def _get_capitalcom_price(account_id: str = "") -> Optional[float]:
+    """
+    用 Capital.com API 拎 BTCUSD 價格做 fallback。
+    """
+    try:
+        from capitalcom_paper import get_market_info
+        aid = account_id or "321895128687259934"
+        info = get_market_info("BTCUSD", aid)
+        if info and isinstance(info, dict):
+            mid = info.get("mid")
+            if mid:
+                return float(mid)
+            bid = info.get("bid")
+            offer = info.get("offer")
+            if bid and offer:
+                return (float(bid) + float(offer)) / 2.0
+            if bid:
+                return float(bid)
+            if offer:
+                return float(offer)
+    except ImportError:
+        print("⚠️ [BTC-SWING] capitalcom_paper not available")
+    except Exception as e:
+        print(f"⚠️ [BTC-SWING] Capital.com price error: {e}")
+    return None
+
+
+# ==================== Binance OHLC + ATR ====================
+
+
+def _get_binance_ohlc(symbol: str = "BTCUSDT", interval: str = "1h", limit: int = 15) -> Optional[List]:
+    """
+    從 Binance public API 拎 klines（OHLCV 數據）。
+    Return list of [time, open, high, low, close, volume, ...] 或 None。
+    """
+    try:
+        url = f"{BINANCE_API}?symbol={symbol}&interval={interval}&limit={limit}"
+        req = urllib.request.Request(url, method="GET")
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+        if not isinstance(data, list) or len(data) < 2:
+            return None
+        # Binance klines format:
+        # [open_time, open, high, low, close, volume, ...]
+        result = []
+        for k in data:
+            result.append([
+                int(k[0]),       # open_time
+                float(k[1]),     # open
+                float(k[2]),     # high
+                float(k[3]),     # low
+                float(k[4]),     # close
+                float(k[5]),     # volume
+            ])
+        return result
+    except (urllib.error.URLError, urllib.error.HTTPError,
+            json.JSONDecodeError, OSError, TimeoutError) as e:
+        print(f"⚠️ [BTC-SWING] Binance OHLC error: {e}")
+    except Exception as e:
+        print(f"⚠️ [BTC-SWING] Binance unexpected error: {e}")
+    return None
+
+
+def _compute_atr(klines: List, period: int = 14) -> Optional[float]:
+    """
+    用 SMA 方法計算 ATR（Average True Range）。
+    傳入至少 period + 1 支 candle。
+    Return: ATR 值（以美元計），或 None 如果數據不足。
+    """
+    if not klines or len(klines) < period + 1:
+        return None
+    try:
+        tr_values = []
+        for i in range(1, len(klines)):
+            high = klines[i][2]   # high
+            low = klines[i][3]    # low
+            prev_close = klines[i - 1][4]  # prev close
+            tr = max(
+                high - low,
+                abs(high - prev_close),
+                abs(low - prev_close),
+            )
+            tr_values.append(tr)
+        # SMA of TR values (first ATR period)
+        if len(tr_values) < period:
+            return None
+        atr = sum(tr_values[-period:]) / period
+        return round(atr, 2)
+    except (IndexError, TypeError, ValueError) as e:
+        print(f"⚠️ [BTC-SWING] ATR compute error: {e}")
+        return None
+
+
+def _get_atr_pct(price: float, atr: float) -> Optional[float]:
+    """
+    將 ATR 轉換為價格百分比。
+    如果價格 <= 0 或 atr <= 0 就 return None。
+    """
+    if not price or price <= 0 or not atr or atr <= 0:
+        return None
+    return round(atr / price, 6)
+
+
+# ==================== OI State Management ====================
+
+
+def _load_oi_state() -> dict:
+    """Load OI tracking state from JSON file."""
+    try:
+        with open(OI_STATE_FILE, "r") as f:
+            return json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError):
+        return {"prev_oi": 0.0, "prev_oi_ts": 0.0, "oi_delta": 0.0}
+
+
+def _save_oi_state(state: dict):
+    """Save OI tracking state to JSON file atomically."""
+    os.makedirs(os.path.dirname(OI_STATE_FILE), exist_ok=True)
+    tmp = OI_STATE_FILE + ".tmp"
+    try:
+        with open(tmp, "w") as f:
+            json.dump(state, f, indent=2)
+        os.replace(tmp, OI_STATE_FILE)
+    except Exception as e:
+        print(f"⚠️ [BTC-SWING] OI state save error: {e}")
+
+
+# ==================== BTC Swing Engine ====================
+
+
+class BtcSwingEngine(SwingEngine):
+
+    # === Engine-specific config params ===
+    OI_DELTA_LONG_THRESHOLD: float = 0.3
+    OI_DELTA_SHORT_THRESHOLD: float = -0.5
+    STOP_LOSS_ATR_MULT: float = 4.0
+    ATR_PERIOD: int = 14
+
+    def _get_engine_param_map(self) -> dict:
+        return {
+            "oi_delta_long_threshold": "OI_DELTA_LONG_THRESHOLD",
+            "oi_delta_short_threshold": "OI_DELTA_SHORT_THRESHOLD",
+            "stop_loss_atr_mult": "STOP_LOSS_ATR_MULT",
+            "atr_period": "ATR_PERIOD",
+        }
+
+    STOP_LOSS_PCT: float = 0.06  # Auto-optimized by daily_review
+    """
+    Bitcoin Intraday Swing Engine — OI Delta 做主 Edge。
+    ——————————————————————————————————————————————————
+    Edge Sources:
+      1. OI Delta（15-min window）— primary
+      2. Funding Rate — 極端值做反轉 bias
+      3. Flow Context — VIX regime bias adjustment
+
+    風險管理：
+      - ATR-based dynamic SL（14 period, 2.5× multiplier）
+      - Fixed TP 5% (1:2.5 RR)
+      - Trailing stop 啟動後 1.5%
+      - 4hr time stop
+    """
+
+    # === 引擎設定 ===
+    MARKET = "BTC"
+    EPIC = "BTCUSD"
+    ACCOUNT_KEY = "crypto"
+
+    # === 風險參數 ===
+    MAX_POSITIONS = 1
+    MAX_EXPOSURE_PCT = 0.70
+    RISK_PER_TRADE_PCT = 0.02       # 2% 每筆風險
+    STOP_LOSS_ATR_MULT = 2.5        # ATR × 2.5 做 SL（crypto 需要更闊）
+    TAKE_PROFIT_PCT = 0.030000000000000002          # Fixed TP 5% (1:2.5 RR)
+    TRAILING_ACTIVATION_PCT = 0.015  # 2% 利潤後開始 trailing
+    TRAILING_DISTANCE_PCT = 0.015   # Trail 1.5% 距離
+    TIME_STOP_MINUTES = 240         # 4 小時 time stop
+
+    # === 技術指標參數 ===
+    ATR_PERIOD = 14                 # ATR 計算週期（1hr candle）
+
+    # === OI Delta 信號 Threshold ===
+    OI_DELTA_LONG_THRESHOLD = 0.3        # 0.3% — 更積極捕捉 OI 流入 (was 0.5%)
+    OI_DELTA_SHORT_THRESHOLD = -0.5      # -0.5% — 更積極捕捉 OI 流出 (was -1.0%)
+
+    # === Funding 極端 Threshold ===
+    FUNDING_LONG_BIAS = -0.0003         # -0.03% → longs paying → LONG bias
+    FUNDING_SHORT_BIAS = 0.0003         # +0.03% → shorts paying → SHORT bias
+
+    def __init__(self, name: str = None):
+        super().__init__(name or "btc")
+        # 載入 OI 追蹤狀態
+        self._oi_state = _load_oi_state()
+        print(f"🤖 BTC Swing Engine initialised — account: {self.ACCOUNT_KEY} ({self.account_id})")
+        print(f"   OI prev={self._oi_state.get('prev_oi', 0):.2f}, delta={self._oi_state.get('oi_delta', 0):.4f}%")
+
+    # ==================== 數據獲取 ====================
+
+    def get_market_data(self) -> Dict:
+        """
+        收集 BTC 市場數據（Swing 版本，放棄 OB/CVD，改用 OI + ATR）。
+
+        Return dict:
+          - mid_price: 最新中間價（Hyperliquid 優先，Capital.com fallback）
+          - funding_rate: Hyperliquid funding rate
+          - oi_data: {"current_oi": float, "delta_pct": float, "prev_oi": float}
+          - atr_data: {"atr_usd": float, "atr_pct": float} 或 None
+          - capitalcom_price: fallback price
+          - timestamp: ISO timestamp
+          - sources_alive / sources_dead
+        """
+        result = {
+            "timestamp": datetime.now(HKT).isoformat(),
+            "mid_price": None,
+            "funding_rate": None,
+            "oi_data": {"current_oi": 0.0, "delta_pct": 0.0, "prev_oi": 0.0},
+            "atr_data": None,
+            "capitalcom_price": None,
+            "sources_alive": [],
+            "sources_dead": [],
+        }
+
+        # === 1. Hyperliquid L2 Book → mid price ===
+        try:
+            l2_book = _get_hl_l2_book()
+            if l2_book:
+                result["sources_alive"].append("hl_l2_book")
+                mid = _get_hl_mid_price(l2_book)
+                if mid:
+                    result["mid_price"] = mid
+            else:
+                result["sources_dead"].append("hl_l2_book")
+        except Exception as e:
+            print(f"⚠️ [BTC-SWING] L2 exception: {e}")
+            result["sources_dead"].append("hl_l2_book")
+
+        # === 2. Hyperliquid metaAndAssetCtxs → OI + funding ===
+        try:
+            meta_ctxs = _get_hl_meta_and_ctxs()
+            if meta_ctxs:
+                result["sources_alive"].append("hl_meta_ctxs")
+                universe = meta_ctxs.get("universe", [])
+                ctxs = meta_ctxs.get("assetCtxs", [])
+
+                # 搵 BTC index
+                btc_idx = None
+                for i, coin in enumerate(universe):
+                    if coin.get("name") == "BTC":
+                        btc_idx = i
+                        break
+
+                if btc_idx is not None and btc_idx < len(ctxs):
+                    btc_ctx = ctxs[btc_idx]
+
+                    # Funding rate
+                    funding_str = btc_ctx.get("funding")
+                    if funding_str is not None:
+                        result["funding_rate"] = float(funding_str)
+
+                    # Open Interest — OI Delta 計算
+                    oi_str = btc_ctx.get("openInterest")
+                    if oi_str is not None:
+                        current_oi = float(oi_str)
+                        prev_oi = self._oi_state.get("prev_oi", 0.0)
+
+                        # 計算 OI Delta（%）
+                        delta_pct = 0.0
+                        if prev_oi > 0:
+                            delta_pct = (current_oi - prev_oi) / prev_oi * 100.0
+
+                        result["oi_data"] = {
+                            "current_oi": current_oi,
+                            "delta_pct": round(delta_pct, 4),
+                            "prev_oi": prev_oi,
+                        }
+
+                        # 更新 state（每次 scan 都更新）
+                        self._oi_state["prev_oi"] = current_oi
+                        self._oi_state["prev_oi_ts"] = time.time()
+                        self._oi_state["oi_delta"] = round(delta_pct, 4)
+                        _save_oi_state(self._oi_state)
+                else:
+                    print("⚠️ [BTC-SWING] BTC not found in HL universe")
+            else:
+                result["sources_dead"].append("hl_meta_ctxs")
+        except Exception as e:
+            print(f"⚠️ [BTC-SWING] meta/ctxs exception: {e}")
+            result["sources_dead"].append("hl_meta_ctxs")
+
+        # === 3. Binance OHLC → ATR ===
+        try:
+            klines = _get_binance_ohlc(symbol="BTCUSDT", interval="1h", limit=self.ATR_PERIOD + 1)
+            if klines and len(klines) >= self.ATR_PERIOD + 1:
+                result["sources_alive"].append("binance_ohlc")
+                atr_usd = _compute_atr(klines, period=self.ATR_PERIOD)
+                if atr_usd and atr_usd > 0:
+                    price_for_atr = result.get("mid_price") or 0
+                    if price_for_atr > 0:
+                        atr_pct = round(atr_usd / price_for_atr, 6)
+                    else:
+                        atr_pct = None
+                    result["atr_data"] = {
+                        "atr_usd": atr_usd,
+                        "atr_pct": atr_pct,
+                    }
+            else:
+                result["sources_dead"].append("binance_ohlc")
+        except Exception as e:
+            print(f"⚠️ [BTC-SWING] ATR exception: {e}")
+            result["sources_dead"].append("binance_ohlc")
+
+        # === 4. Capital.com 價格 fallback ===
+        if result["mid_price"] is None:
+            try:
+                cc_price = _get_capitalcom_price(account_id=self.account_id)
+                if cc_price:
+                    result["capitalcom_price"] = cc_price
+                    result["mid_price"] = cc_price
+                    result["sources_alive"].append("capitalcom_price")
+                else:
+                    result["sources_dead"].append("capitalcom_price")
+            except Exception as e:
+                print(f"⚠️ [BTC-SWING] Capital.com exception: {e}")
+                result["sources_dead"].append("capitalcom_price")
+
+        # Debug summary
+        alive = len(result["sources_alive"])
+        dead = len(result["sources_dead"])
+        oi_delta = result["oi_data"]["delta_pct"]
+        atr_info = f"atr={result['atr_data']['atr_usd']:.0f}$" if result["atr_data"] else "atr=n/a"
+        print(f"📡 [BTC-SWING] — {alive} alive, {dead} dead, price={result['mid_price']}, "
+              f"oi_delta={oi_delta:.2f}%, {atr_info}")
+
+        return result
+
+    # ==================== 信號生成 ====================
+
+    def generate_signal(self, data: Dict) -> Optional[Dict]:
+        """
+        OI Delta 做主 Edge 嘅信號生成邏輯。
+
+        Priority order:
+          1. OI Delta + Price: OI↑ + price↑ → LONG (new money inflow)
+          2. OI Delta + Price: OI↓ + price↓ → SHORT (longs puking, oversold)
+          3. Funding extreme: funding > 0.03% → SHORT bias
+             funding < -0.03% → LONG bias
+          4. Flow context: VIX fear → reinforce SHORT
+
+        SL = ATR-based dynamic（ATR × 2.5）
+        TP = Fixed 5%
+        """
+        price = data.get("mid_price")
+        if not price or price <= 0:
+            print("❌ [BTC-SWING] No valid price — cannot generate signal")
+            return None
+
+        oi_data = data.get("oi_data", {})
+        funding_rate = data.get("funding_rate")
+        atr_data = data.get("atr_data")
+        flow_ctx = data.get("_flow", {})
+        bias_adj = flow_ctx.get("bias_adjustment", {"LONG": 0, "SHORT": 0})
+
+        # === OI Delta threshold check — 需要有 OI data ===
+        oi_delta = oi_data.get("delta_pct", 0.0)
+        has_oi_data = oi_data.get("prev_oi", 0.0) > 0  # 第一次 scan 之後先有 prev
+
+        # === 計算 ATR-based SL 距離 ===
+        # 先用 ATR 數據，fallback 去 fixed 2%（如果 ATR 失效）
+        atr_pct = None
+        if atr_data and atr_data.get("atr_pct"):
+            atr_pct = atr_data["atr_pct"]
+
+        # Edge weight gate: atr_breakout
+        atr_edge_weight = self.edge_weights.get("atr_breakout", 1.0)
+        if atr_edge_weight < 0.1:
+            # Edge suppressed: skip ATR-based SL, use fixed fallback
+            sl_pct = 0.02
+            print(f"⚠️ [BTC-SWING] atr_breakout edge suppressed (weight={atr_edge_weight}), using fixed SL 2%")
+        elif atr_pct and atr_pct > 0:
+            sl_pct = atr_pct * self.STOP_LOSS_ATR_MULT
+            sl_pct = min(sl_pct, 0.10)  # 限制 max SL 10%，防止極端情況
+            if atr_edge_weight < 0.5:
+                # Reduced confidence: shrink SL by weight
+                sl_pct = sl_pct * atr_edge_weight
+                print(f"⚠️ [BTC-SWING] atr_breakout reduced (weight={atr_edge_weight}), SL scaled to {sl_pct*100:.2f}%")
+        else:
+            # ATR 失效時用 fallback
+            sl_pct = 0.02  # 2% fixed fallback
+            print(f"⚠️ [BTC-SWING] ATR not available, using fixed SL 2%")
+
+        print(f"📐 [BTC-SWING] SL distance: {sl_pct*100:.2f}% (atr_pct={atr_pct*100:.2f}% × {self.STOP_LOSS_ATR_MULT}x)"
+              if atr_pct else f"📐 [BTC-SWING] SL distance: {sl_pct*100:.2f}% (fixed fallback)")
+
+        # === Signal Logic ===
+
+        direction = None
+        reasons = []
+        strategy_signals = []
+
+        # --- Priority 1: OI Delta + Price ---
+        oi_edge_weight = self.edge_weights.get("oi_delta", 1.0)
+        if oi_edge_weight >= 0.1 and has_oi_data:
+            if oi_delta > self.OI_DELTA_LONG_THRESHOLD:
+                # OI 上升 + 價格上升 → new money inflow → LONG
+                # 簡單價格方向判斷：比以前 latest OI snapshot 時高
+                strategy_signals.append("oi_long")
+                reasons.append(f"OI Delta={oi_delta:.2f}% (> {self.OI_DELTA_LONG_THRESHOLD*100:.1f}%)")
+                # 唔需要額外 price confirmation，OI ↑ 本身代表 money inflow
+                # 但如果 price 明顯跌緊就 skip
+                direction = "LONG"
+
+            elif oi_delta < self.OI_DELTA_SHORT_THRESHOLD:
+                # OI 急跌 + 價格跌 → longs puking → SHORT (oversold)
+                strategy_signals.append("oi_short")
+                reasons.append(f"OI Delta={oi_delta:.2f}% (< {self.OI_DELTA_SHORT_THRESHOLD*100:.1f}%)")
+                direction = "SHORT"
+
+        if direction:
+            print(f"🔍 [BTC-SWING] Priority 1 (OI Delta): {direction} — {', '.join(reasons)}")
+
+        # --- Priority 2: Funding Extreme (bias 修正) ---
+        fund_edge_weight = self.edge_weights.get("funding_bias", 1.0)
+        if direction is None and fund_edge_weight >= 0.1 and funding_rate is not None:
+            funding_bps = funding_rate * 10000  # 轉做 bp 方便顯示
+            if funding_rate > self.FUNDING_SHORT_BIAS:
+                # shorts paying premium → market overheated → SHORT bias
+                direction = "SHORT"
+                strategy_signals.append("funding_extreme_short")
+                reasons.append(f"Funding={funding_rate*100:.4f}% (> {self.FUNDING_SHORT_BIAS*100:.4f}%)")
+                print(f"🔍 [BTC-SWING] Priority 2 (Funding): SHORT — {reasons[-1]}")
+            elif funding_rate < self.FUNDING_LONG_BIAS:
+                # longs paying premium → market oversold → LONG bias
+                direction = "LONG"
+                strategy_signals.append("funding_extreme_long")
+                reasons.append(f"Funding={funding_rate*100:.4f}% (< {self.FUNDING_LONG_BIAS*100:.4f}%)")
+                print(f"🔍 [BTC-SWING] Priority 2 (Funding): LONG — {reasons[-1]}")
+
+        # --- Priority 3: Flow Context Bias ---
+        if direction is None:
+            b_long = bias_adj.get("LONG", 0)
+            b_short = bias_adj.get("SHORT", 0)
+            if b_long > 0 and b_short == 0:
+                direction = "LONG"
+                strategy_signals.append("flow_bias_long")
+                reasons.append(f"Flow bias LONG+{b_long}")
+                print(f"🔍 [BTC-SWING] Priority 3 (Flow): LONG — {reasons[-1]}")
+            elif b_short > 0 and b_long == 0:
+                direction = "SHORT"
+                strategy_signals.append("flow_bias_short")
+                reasons.append(f"Flow bias SHORT+{b_short}")
+                print(f"🔍 [BTC-SWING] Priority 3 (Flow): SHORT — {reasons[-1]}")
+
+        # --- Smart Money Risk Filter (before SL/TP calc) ---
+        sm_ctx = flow_ctx.get("smart_money", {})
+        sm_whales = sm_ctx.get("whales", {}).get("BTC", {})
+        risk_mult = 1.0
+        if sm_whales:
+            sm_ls = sm_whales.get("ls_ratio", 0.5)
+            sm_long_profit = sm_whales.get("long_profit_pct", 50)
+            sm_short_entry = sm_whales.get("short_entry", 0)
+            sm_long_entry = sm_whales.get("long_entry", 0)
+            
+            # Extreme positioning → reduce risk
+            if sm_ls < 0.20:
+                risk_mult = 0.5
+                reasons.append(f"🛡️ Smart Money: extreme short ({sm_ls:.2f}), risk ×0.5")
+            elif sm_ls < 0.30:
+                risk_mult = 0.7
+                reasons.append(f"🛡️ Smart Money: heavy short ({sm_ls:.2f}), risk ×0.7")
+            # Longs deep underwater → reduce risk  
+            if sm_long_profit < 20:
+                risk_mult = min(risk_mult, 0.6)
+                reasons.append(f"🛡️ Smart Money: longs trapped ({sm_long_profit:.0f}%), risk ×0.6")
+            # Squeeze warning → tighten SL
+            if sm_short_entry > sm_long_entry * 1.05 and sm_short_entry > 0:
+                risk_mult = min(risk_mult, 0.5)
+                reasons.append(f"🛡️ Smart Money: squeeze risk, risk ×0.5")
+            
+            if risk_mult < 1.0:
+                print(f"🛡️ [BTC-SWING] Smart Money risk filter: ×{risk_mult:.1f} "
+                      f"(L/S={sm_ls:.2f}, L_win={sm_long_profit:.0f}%)")
+
+        # --- 所有 priority 都冇 signal — skip if no direction ---
+        if direction is None:
+            oi_status = f"oi_delta={oi_delta:.2f}%" if has_oi_data else "oi=first_scan"
+            funding_status = f"funding={funding_rate*100:.4f}%" if funding_rate is not None else "funding=na"
+            print(f"⏸️ [BTC-SWING] No signal — {oi_status}, {funding_status}")
+            return None
+
+        # ==================== SL / TP 計算 ====================
+
+        if direction == "LONG":
+            stop = round(price * (1 - sl_pct), 2)
+            target = round(price * (1 + self.TAKE_PROFIT_PCT), 2)
+        else:
+            stop = round(price * (1 + sl_pct), 2)
+            target = round(price * (1 - self.TAKE_PROFIT_PCT), 2)
+
+        # 組合策略名稱
+        strategy_name = "+".join(strategy_signals) if strategy_signals else "oi_swing"
+        reason_str = " | ".join(reasons)
+
+        signal = {
+            "strategy": strategy_name,
+            "epic": self.EPIC,
+            "label": self.MARKET,
+            "direction": direction,
+            "entry": price,
+            "stop": stop,
+            "target": target,
+            "reason": reason_str,
+            "atr_sl_mult": self.STOP_LOSS_ATR_MULT,
+            "atr_pct": atr_pct,
+            "sl_pct": sl_pct,
+            "risk_mult": risk_mult,  # Smart Money risk filter
+        }
+
+        print(f"🚦 [BTC-SWING] SIGNAL: {direction} BTC @ {price} | "
+              f"SL={stop} ({sl_pct*100:.2f}%) | TP={target} ({self.TAKE_PROFIT_PCT*100:.0f}%) | "
+              f"{reason_str}")
+        return signal
+
+    # ==================== Flow Bias Hook ====================
+
+    def interpret_flow_bias(self, flow_data: Dict) -> Dict:
+        """
+        HOOK: BTC-specific flow interpretation.
+
+        Rules:
+          - VIX regime == "fear" or "high" → SHORT +1（crypto 喺恐慌時偏向跌）
+          - VIX regime == "complacency" → LONG +1（低波動時 risk-on）
+          - BTC_DOMINANCE_HIGH in flow_signals → neutral（alt rotation，唔 trade BTC）
+
+        Returns {"LONG": int, "SHORT": int}.
+        """
+        bias = {"LONG": 0, "SHORT": 0}
+
+        try:
+            vix_regime = flow_data.get("vix_regime", "unknown")
+            signals = flow_data.get("signals", [])
+
+            # VIX fear / high → crypto 恐慌拋售 → SHORT bias
+            if vix_regime in ("fear", "high"):
+                bias["SHORT"] += 1
+                print(f"🌊 [BTC-SWING] Flow: VIX={vix_regime} → SHORT+1")
+
+            # VIX complacency → risk-on environment → LONG bias
+            elif vix_regime == "complacency":
+                bias["LONG"] += 1
+                print(f"🌊 [BTC-SWING] Flow: VIX={vix_regime} → LONG+1")
+
+            # BTC dominance high → alt rotation → 唔 trade BTC（neutral）
+            if "BTC_DOMINANCE_HIGH" in signals:
+                bias["LONG"] = 0
+                bias["SHORT"] = 0
+                print(f"🌊 [BTC-SWING] Flow: BTC_DOMINANCE_HIGH → neutral (alt rotation)")
+
+            return bias
+
+        except Exception as e:
+            print(f"⚠️ [BTC-SWING] interpret_flow_bias error: {e}")
+            return {"LONG": 0, "SHORT": 0}
+
+
+# ==================== 快速測試 ====================
+
+if __name__ == "__main__":
+    print("=" * 60)
+    print("🔬 BTC Swing Engine — Quick Test")
+    print("=" * 60)
+
+    engine = BtcSwingEngine()
+
+    # Test 1: get_market_data
+    print("\n📡 Testing get_market_data()...")
+    data = engine.get_market_data()
+    print(f"   Price: {data.get('mid_price')}")
+    print(f"   OI Delta: {data.get('oi_data', {}).get('delta_pct')}%")
+    print(f"   Funding: {data.get('funding_rate')}")
+    print(f"   ATR: {data.get('atr_data')}")
+    print(f"   Sources alive: {data.get('sources_alive')}")
+    print(f"   Sources dead: {data.get('sources_dead')}")
+
+    # Test 2: generate_signal
+    print("\n🚦 Testing generate_signal()...")
+    # Inject dummy flow context for testing
+    data["_flow"] = engine.get_flow_context()
+    signal = engine.generate_signal(data)
+    if signal:
+        print(f"   ✅ Signal: {signal['direction']} @ {signal['entry']}")
+        print(f"      SL: {signal['stop']} | TP: {signal['target']}")
+        print(f"      SL%: {signal.get('sl_pct', 0)*100:.2f}%")
+        print(f"      Reason: {signal['reason']}")
+    else:
+        print("   ❌ No signal (market conditions not met)")
+
+    # Test 3: engine status
+    print("\n📊 Testing status()...")
+    status = engine.status()
+    print(f"   Balance: {status.get('balance')}")
+    print(f"   Positions: {status.get('positions')}")
+    print(f"   Paused: {status.get('paused')}")
+
+    # Test 4: scan cycle
+    print("\n🔄 Testing scan() cycle...")
+    scan_result = engine.scan()
+    print(f"   Signals found: {scan_result.get('signals_found')}")
+    print(f"   Executed: {scan_result.get('executed')}")
+    if "error" in scan_result:
+        print(f"   Error: {scan_result['error']}")
+
+    # Test 5: interpret_flow_bias
+    print("\n🌊 Testing interpret_flow_bias()...")
+    flow_test_cases = [
+        {"vix_regime": "fear", "signals": []},
+        {"vix_regime": "complacency", "signals": []},
+        {"vix_regime": "high", "signals": ["BTC_DOMINANCE_HIGH"]},
+        {"vix_regime": "unknown", "signals": []},
+    ]
+    for tc in flow_test_cases:
+        bias = engine.interpret_flow_bias(tc)
+        print(f"   flow={tc} → bias={bias}")
+
+    print("\n✅ BTC Swing Engine test complete")

@@ -1,0 +1,79 @@
+# 📊 Weekly Edge Review v2 — 2026-05-30 08:00 HKT
+
+## Executive Summary
+- Engines active: 7
+- Total trades: 53
+- Total P&L: $+108.99
+- Overall win rate: 11.3%
+
+## Per-Engine Edge Breakdown
+
+### BTC
+Total: 1 trades | P&L: $+0.00 | WR: 0.0%
+- **unknown**: 1 trades, $+0.00 P&L, WR=0.0%, PF=inf
+
+### btc
+Total: 5 trades | P&L: $+35.39 | WR: 40.0%
+- **oi_delta**: 5 trades, $+35.39 P&L, WR=40.0%, PF=9.51
+
+### equities
+Total: 3 trades | P&L: $+9.14 | WR: 33.3%
+- **stock_alpha**: 3 trades, $+9.14 P&L, WR=33.3%, PF=2.48
+
+### eth
+Total: 7 trades | P&L: $+74.66 | WR: 14.3%
+- **ratio_btc**: 7 trades, $+74.66 P&L, WR=14.3%, PF=3.94
+
+### gold
+Total: 9 trades | P&L: $-4.66 | WR: 11.1%
+- **vix_regime**: 9 trades, $-4.66 P&L, WR=11.1%, PF=0.1
+
+### indices
+Total: 27 trades | P&L: $-5.54 | WR: 3.7%
+- **vix_direction**: 27 trades, $-5.54 P&L, WR=3.7%, PF=0.54
+
+### paper
+Total: 1 trades | P&L: $+0.00 | WR: 0.0%
+- **unknown**: 1 trades, $+0.00 P&L, WR=0.0%, PF=inf
+
+## Regime Analysis
+- **low**: 17 trades, $-3.97 P&L, WR=5.9%
+- **unknown**: 29 trades, $+114.46 P&L, WR=17.2%
+
+## Top Edge × Regime × Day Cells
+- ratio_btc / unknown / Monday: 1 trades, $+100.03 P&L
+- oi_delta / low / Tuesday: 1 trades, $+26.47 P&L
+- oi_delta / unknown / Sunday: 1 trades, $+13.08 P&L
+- ratio_btc / low / Monday: 2 trades, $-11.72 P&L
+- stock_alpha / unknown / Unknown: 3 trades, $+9.14 P&L
+- ratio_btc / low / Tuesday: 2 trades, $-8.54 P&L
+- vix_direction / unknown / Unknown: 1 trades, $+6.57 P&L
+- ratio_btc / low / Thursday: 2 trades, $-5.11 P&L
+- vix_direction / unknown / Thursday: 7 trades, $-4.61 P&L
+- vix_direction / unknown / Tuesday: 9 trades, $-4.48 P&L
+
+## Hypotheses (6)
+
+1. **vix_direction** | all | confidence=95%
+   Overall edge performance is severely degraded with a 3.7% win rate over 27 trades, requiring immediate risk reduction.
+   → decrease_weight on indices
+
+2. **vix_direction** | unknown | confidence=90%
+   Mid-week (Tue-Thu) trading in unknown VIX regimes yields a 0% win rate over 19 trades, indicating severe signal decay.
+   → add_filter on indices
+
+3. **ratio_btc** | low | confidence=85%
+   The ratio_btc edge fails completely in low volatility, generating a 0% win rate across 6 trades.
+   → add_filter on eth
+
+4. **oi_delta** | all | confidence=75%
+   Open interest delta signals are highly predictive currently, generating a massive 9.51 profit factor over 5 trades.
+   → increase_weight on btc
+
+5. **vix_regime** | low | confidence=70%
+   Tuesday trading in low VIX regimes produces consistent losses (0% WR over 4 trades).
+   → add_filter on gold
+
+6. **stock_alpha** | unknown | confidence=60%
+   Stock alpha edge maintains positive expectancy (PF 2.48) in unknown VIX regimes.
+   → increase_weight on equities

@@ -1,0 +1,341 @@
+#!/usr/bin/env python3
+"""
+缠論 1买 信號掃描器
+==================
+Standalone module: ZigZag → 中樞 Detection → 1买 Signal → JSON output
+
+Parameters (per-symbol, tuned via P2 research):
+  BTC: (1h min_pct=2.0/min_w=1.0) (4h min_pct=3.0/min_w=2.0)
+  ETH: (1h min_pct=1.5/min_w=2.5) (4h min_pct=3.0/min_w=0.5)
+  SOL: (1h min_pct=3.0/min_w=1.5) (4h min_pct=5.0/min_w=3.0)
+
+Usage:
+  python3 chanlun_scanner.py              # scan all, print to stdout
+  python3 chanlun_scanner.py --save       # scan + save to JSON
+  python3 chanlun_scanner.py --symbol BTC # scan single symbol
+"""
+import numpy as np
+import os, sys, json
+from datetime import datetime, timezone, timedelta
+
+HKT = timezone(timedelta(hours=8))
+DATA_DIR = os.path.expanduser("~/workspace/data/market/phase1")
+SYS_DIR = os.path.expanduser("~/workspace/chanlun_system")
+SIGNAL_FILE = os.path.join(SYS_DIR, "data/signals", "latest.json")
+os.makedirs(os.path.dirname(SIGNAL_FILE), exist_ok=True)
+
+# ── Tuned Parameters ──
+PARAMS = {
+    "BTC": {"1h": (2.0, 1.0, 15), "4h": (3.0, 2.0, 8)},
+    "ETH": {"1h": (1.5, 2.5, 15), "4h": (3.0, 0.5, 8)},
+    "SOL": {"1h": (3.0, 1.5, 15), "4h": (5.0, 3.0, 8)},
+}
+
+# ── Core Functions ──
+
+def ema(data, period):
+    alpha = 2 / (period + 1)
+    result = np.zeros_like(data)
+    result[0] = data[0]
+    for i in range(1, len(data)):
+        result[i] = alpha * data[i] + (1 - alpha) * result[i-1]
+    return result
+
+def macd(close, fast=12, slow=26, signal=9):
+    e_fast = ema(close, fast)
+    e_slow = ema(close, slow)
+    m_line = e_fast - e_slow
+    s_line = ema(m_line, signal)
+    return m_line, s_line, m_line - s_line
+
+def find_zigzag_swings(high, low, min_pct):
+    """Find swing highs and lows using ZigZag"""
+    swings = []
+    last_extreme = None
+    direction = None
+    
+    for i in range(1, len(high)):
+        if direction is None:
+            if last_extreme is None and i > 20:
+                lmax = np.argmax(high[i-20:i]) + (i-20)
+                lmin = np.argmin(low[i-20:i]) + (i-20)
+                if high[lmax] / low[lmin] - 1 > min_pct / 100:
+                    if lmax < lmin:
+                        last_extreme = (lmax, high[lmax], 'H')
+                        direction = 'down'
+                    else:
+                        last_extreme = (lmin, low[lmin], 'L')
+                        direction = 'up'
+            continue
+        
+        if direction == 'up':
+            if high[i] > last_extreme[1]:
+                last_extreme = (i, high[i], 'H')
+            drop_pct = (last_extreme[1] - low[i]) / last_extreme[1] * 100
+            if drop_pct >= min_pct:
+                swings.append(last_extreme)
+                direction = 'down'
+                bi = np.argmin(low[last_extreme[0]:i+1]) + last_extreme[0]
+                last_extreme = (bi, low[bi], 'L')
+        else:
+            if low[i] < last_extreme[1]:
+                last_extreme = (i, low[i], 'L')
+            rise_pct = (high[i] - last_extreme[1]) / last_extreme[1] * 100
+            if rise_pct >= min_pct:
+                swings.append(last_extreme)
+                direction = 'up'
+                bi = np.argmax(high[last_extreme[0]:i+1]) + last_extreme[0]
+                last_extreme = (bi, high[bi], 'H')
+    
+    return swings
+
+def detect_pivots(swings, min_width_pct, min_bars):
+    """Detect 中樞 (consolidation zones)"""
+    pivots = []
+    if len(swings) < 4:
+        return pivots
+    
+    i = 0
+    while i < len(swings) - 3:
+        s0, s1, s2, s3 = swings[i], swings[i+1], swings[i+2], swings[i+3]
+        duration = s3[0] - s0[0]
+        if duration < min_bars:
+            i += 1; continue
+        
+        highs = [s[1] for s in [s0, s1, s2, s3] if s[2] == 'H']
+        lows = [s[1] for s in [s0, s1, s2, s3] if s[2] == 'L']
+        
+        if len(highs) >= 2 and len(lows) >= 2:
+            upper = min(highs)
+            lower = max(lows)
+            width_pct = (upper / lower - 1) * 100
+            
+            if upper > lower and width_pct >= min_width_pct:
+                pivots.append({
+                    "start": int(s0[0]), "end": int(s3[0]),
+                    "upper": round(upper, 2), "lower": round(lower, 2),
+                    "width_pct": round(width_pct, 2),
+                })
+                i += 3; continue
+        i += 1
+    
+    return pivots
+
+def check_divergence(close, macd_line, low_idx, lookback=60):
+    """Check MACD bullish divergence at a local low"""
+    start = max(0, low_idx - lookback)
+    end = min(len(close), low_idx + 5)
+    seg_close = close[start:end]
+    seg_macd = macd_line[start:end]
+    
+    # Find previous swing lows in this segment
+    prev_lows = []
+    for j in range(5, len(seg_close) - 10):
+        window = seg_close[max(0, j-5):min(len(seg_close), j+6)]
+        if seg_close[j] == min(window):
+            prev_lows.append(j)
+    
+    if len(prev_lows) < 2:
+        return False
+    
+    prev_idx = prev_lows[-2]
+    curr_idx = len(seg_close) - 5
+    
+    price_lower_low = seg_close[curr_idx] < seg_close[prev_idx]
+    macd_higher_low = seg_macd[curr_idx] > seg_macd[prev_idx]
+    
+    return price_lower_low and macd_higher_low
+
+def find_1buy(pivots, close, high, low, macd_line, search_window=500):
+    """Find 1买 entries: breakdown below pivot + MACD divergence + recovery"""
+    signals = []
+    
+    for pivot in pivots:
+        p_end = pivot["end"]
+        p_lower = pivot["lower"]
+        p_upper = pivot["upper"]
+        search_end = min(p_end + search_window, len(close))
+        
+        below_pivot = False
+        lowest_idx = p_end
+        lowest_price = close[p_end]
+        
+        for i in range(p_end, search_end):
+            # Track breakdown
+            if close[i] < p_lower:
+                below_pivot = True
+                if low[i] < lowest_price:
+                    lowest_price = low[i]
+                    lowest_idx = i
+            
+            # Recovery signal: price back above pivot lower after being below
+            if below_pivot and close[i] > p_lower and i > lowest_idx + 1:
+                has_div = check_divergence(close, macd_line, lowest_idx)
+                
+                if has_div:
+                    # Calculate distance from pivot
+                    dist_from_lower = (close[i] / p_lower - 1) * 100
+                    dist_from_upper = (close[i] / p_upper - 1) * 100
+                    
+                    signals.append({
+                        "idx": int(i),
+                        "entry_price": round(float(close[i]), 2),
+                        "pivot_lower": p_lower,
+                        "pivot_upper": p_upper,
+                        "pivot_width_pct": pivot["width_pct"],
+                        "lowest_idx": int(lowest_idx),
+                        "lowest_price": round(float(lowest_price), 2),
+                        "dist_from_lower_pct": round(dist_from_lower, 2),
+                        "dist_from_upper_pct": round(dist_from_upper, 2),
+                    })
+                break
+    
+    return signals
+
+# ── Scanner ──
+
+def scan_symbol(symbol, tf):
+    """Scan one symbol/timeframe for 1买 signals. Returns list of active signals."""
+    fname = f"{symbol}_{tf}.npz"
+    fpath = os.path.join(DATA_DIR, fname)
+    
+    if not os.path.exists(fpath):
+        return []
+    
+    min_pct, min_width, min_bars = PARAMS[symbol][tf]
+    
+    data = np.load(fpath)
+    close = data["close"]
+    high = data["high"]
+    low = data["low"]
+    m_line, _, _ = macd(close)
+    
+    swings = find_zigzag_swings(high, low, min_pct)
+    pivots = detect_pivots(swings, min_width, min_bars)
+    
+    if not pivots:
+        return []
+    
+    signals = find_1buy(pivots, close, high, low, m_line)
+    
+    # Only return the MOST RECENT signal per symbol/TF (if any)
+    # Filter: signal must be within last 50 bars to be "active"
+    # Dedup: keep only most recent unique entry bar
+    seen_bars = set()
+    active_signals = []
+    for s in signals:
+        bars_ago = len(close) - 1 - s["idx"]
+        if bars_ago <= 50 and s["idx"] not in seen_bars:
+            seen_bars.add(s["idx"])
+            s["symbol"] = symbol
+            s["tf"] = tf
+            s["bars_ago"] = int(bars_ago)
+            s["current_price"] = round(float(close[-1]), 2)
+            s["pct_from_entry"] = round((close[-1] / s["entry_price"] - 1) * 100, 2)
+            active_signals.append(s)
+    
+    return active_signals
+
+def scan_all(save=False):
+    """Scan all configured symbols/timeframes"""
+    all_signals = []
+    stats = {}
+    
+    for symbol in ["BTC", "ETH", "SOL"]:
+        for tf in ["1h", "4h"]:
+            fname = f"{symbol}_{tf}.npz"
+            fpath = os.path.join(DATA_DIR, fname)
+            
+            if not os.path.exists(fpath):
+                continue
+            
+            data = np.load(fpath)
+            close = data["close"]
+            
+            min_pct, min_width, min_bars = PARAMS[symbol][tf]
+            swings = find_zigzag_swings(data["high"], data["low"], min_pct)
+            pivots = detect_pivots(swings, min_width, min_bars)
+            
+            m_line, _, _ = macd(close)
+            signals = find_1buy(pivots, close, data["high"], data["low"], m_line)
+            
+            # Add metadata
+            for s in signals:
+                s["symbol"] = symbol
+                s["tf"] = tf
+                s["bars_ago"] = int(len(close) - 1 - s["idx"])
+                s["current_price"] = round(float(close[-1]), 2)
+                s["pct_from_entry"] = round((close[-1] / s["entry_price"] - 1) * 100, 2)
+            
+            stats[f"{symbol}_{tf}"] = {
+                "swings": len(swings),
+                "pivots": len(pivots),
+                "total_1buy": len(signals),
+                "active": len([s for s in signals if s["bars_ago"] <= 50]),
+            }
+            
+            # Keep only active signals
+            active = [s for s in signals if s["bars_ago"] <= 50]
+            all_signals.extend(active)
+    
+    output = {
+        "scanned_at": datetime.now(HKT).isoformat(),
+        "timestamp_ts": datetime.now(HKT).timestamp(),
+        "stats": stats,
+        "signals": all_signals,
+        "summary": [],
+    }
+    
+    # Generate human-readable summary
+    if all_signals:
+        output["summary"].append(f"🔔 缠論 1买 信號 ({len(all_signals)} active):")
+        for s in all_signals:
+            direction = "🟢" if s["pct_from_entry"] >= 0 else "🔴"
+            output["summary"].append(
+                f"  {s['symbol']} {s['tf']}: entry=${s['entry_price']:.1f} "
+                f"(now ${s['current_price']:.1f}, {direction}{s['pct_from_entry']:+.1f}%) "
+                f"[{s['bars_ago']} bars ago]"
+            )
+            output["summary"].append(
+                f"    Pivot: ${s['pivot_lower']:.1f}-${s['pivot_upper']:.1f} "
+                f"(w={s['pivot_width_pct']:.1f}%), lowest=${s['lowest_price']:.1f}"
+            )
+    else:
+        output["summary"].append("✅ 無活躍 1买 信號")
+    
+    if save:
+        tmp = SIGNAL_FILE + ".tmp"
+        with open(tmp, "w") as f:
+            json.dump(output, f, indent=2, default=str)
+        os.replace(tmp, SIGNAL_FILE)
+    
+    return output
+
+# ── CLI ──
+
+if __name__ == "__main__":
+    save_mode = "--save" in sys.argv
+    symbol_filter = None
+    
+    for arg in sys.argv[1:]:
+        if arg.startswith("--symbol="):
+            symbol_filter = arg.split("=")[1].upper()
+    
+    if symbol_filter:
+        for tf in ["1h", "4h"]:
+            signals = scan_symbol(symbol_filter, tf)
+            for s in signals:
+                print(f"{s['symbol']} {s['tf']}: entry=${s['entry_price']:.1f} "
+                      f"[{s['bars_ago']} bars ago] "
+                      f"pivot=${s['pivot_lower']:.1f}-${s['pivot_upper']:.1f}")
+        if save_mode:
+            output = scan_all(save=True)
+    else:
+        output = scan_all(save=save_mode)
+        
+        # Print summary
+        for line in output["summary"]:
+            print(line)
+        
+        if save_mode:
+            print(f"\n✅ Signals saved to: {SIGNAL_FILE}")

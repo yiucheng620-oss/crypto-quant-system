@@ -1,0 +1,51 @@
+美股今日（2026年5月27日）在原油價格大幅回落及中東局勢（美伊談判）緩和的推動下，整體維持在高位震盪。標普500指數與納斯達克指數微升，續創收市歷史新高。盤後科技板塊因財報及重大AI基礎設施合作而出現劇烈分化。
+
+以下為今日美股最值得關注的交易機會與風險分析：
+
+## 🔥 新聞驅動推薦
+
+| TICKER | 方向 | Catalyst (催化劑) | 信心 | 原因 |
+| :--- | :--- | :--- | :--- | :--- |
+| **AMZN** | **LONG (看多)** | AWS 獲 Snowflake $60億 AI 晶片大單 | **HIGH (高)** | Snowflake 宣佈與 AWS 簽署 5 年 $60億的戰略合作協議，承諾大量採購 Amazon 自研的 **Graviton** CPU 及 AI 晶片基礎設施。這直接印證了亞馬遜自研晶片（ASIC）在降低 AI 算力成本上的極強競爭力，AWS 的高利潤率業務將迎來強勁增長引擎。 |
+| **CRM** | **SHORT (看空)** | 盤後財報指引及 cRPO 未達預期，引發 AI 變現質疑 | **MED (中)** | Salesforce 盤後公佈第一季財報，雖然 EPS 超預期且微調了全年營收下限，但關鍵指標 **當前剩餘履約義務 (cRPO)** 僅為 $336億，低於市場預期的 $337億。此外，市場擔心企業客戶向 AI Agent（Agentforce）轉型過程中，會減少對其傳統昂貴 SaaS 訂閱的依賴，導致股價盤後受壓下跌約 2.8%。 |
+| **UAL** | **LONG (看多)** | 原油價格暴跌，航司成本壓力驟減 | **HIGH (高)** | 美伊地緣政治局勢緩和，市場預期霍爾木茲海峽將重新開放，布蘭特原油大跌 3.7% 至 $95.88 桶，美油跌 4.5% 至 $89.72 桶。聯合航空（United Airlines）今日大漲 6.3%，油價回落將直接轉化為航空公司第二季的淨利潤增長，燃料成本敏感型板塊迎來強勁反彈。 |
+
+---
+
+## ⚠️ 風險警示
+
+*   **避開板塊：傳統能源與石油巨頭（如 XOM, CVX）**
+    *   **原因**：隨著美伊停火談判取得進展，原油價格今日大幅回撤。埃克森美孚（XOM）下跌 2.2%，雪佛龍（CVX）下跌 1.5%。在油價重新站穩 $90/桶上方之前，能源板塊將面臨持續的資金流出與估值修正壓力。
+*   **關注事件：摩根大通（JPM）警告支出上升**
+    *   **原因**：CEO 戴蒙（Jamie Dimon）警告今年集團支出可能比預期高出 10 億美元，導致 JPM 今日下跌 2.4%，並拖累整體金融板塊表現。需警惕大型銀行股因通脹及運營成本上升帶來的利潤率壓縮風險。
+
+---
+
+## 📊 市場情緒
+
+*   **整體判斷**：**Risk-On（偏向樂觀但高位震盪）**
+    *   雖然科技巨頭 AI 狂熱出現短暫喘息，但高盛今日將 2026 年底標普 500 指數目標價上調至 **8,000 點**，極大地提振了市場多頭信心。
+    *   油價回落降低了通脹預期，10年期美債收益率下滑至 4.47%，為股市估值提供了支撐。
+*   **最強板塊**：**非必需消費品（Consumer Discretionary）**、**航空與郵輪**（受惠於油價下跌及消費信心復甦，如 NCLH, UAL 大漲）。
+*   **最弱板塊**：**能源（Energy）**（受原油暴跌拖累）、**金融（Financials）**（受 JPM 成本警告拖累）。
+
+📎 Sources:
+- indiatimes.com: https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQFhzIHPMI2lwWCNsL0xNd-scl97-t9bE
+- businesstimes.com.sg: https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQEM3urBcSV1e9bw9CyFC_4ICMBhLGLDv
+- thestreet.com: https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQGfrTFwKJYQmgNxZqI420YNfFT5fNEgJ
+- tradingkey.com: https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQH-0sfWKd6aJLMmatHfhO8KSiCUbHgQr
+- geekwire.com: https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQF084u8OrB3JaU909v2LiAA_ADHrzF_N
+
+
+## 📐 Trading Setups
+
+| Ticker | 方向 | Entry | SL | TP | RR | ATR | Trend | 來源 |
+|:--|:--|--:|--:|--:|--:|--:|:--|:--|
+| **AMZN** | LONG | $271.85 | $262.43 | $290.69 | 2.0 | $6.28 | 📉 下降 | YF calc |
+| **CRM** | LONG | $177.51 | $166.65 | $199.24 | 2.0 | $7.25 | 📈 上升 | YF calc |
+| **XOM** | LONG | $147.90 | $147.82 | $161.08 | 156.2 | $4.39 | 📈 上升 | Screener |
+| **CVX** | LONG | $182.40 | $182.12 | $196.22 | 49.5 | $4.61 | 📊 盤整 | Screener |
+| **JPM** | LONG | $299.28 | $289.54 | $318.76 | 2.0 | $6.51 | 📉 下降 | YF calc |
+
+> **Screener** = technical screener 計算 | **YF calc** = 快速 yfinance ATR-based (1.5x SL / 3x TP)
+> ⚠️ YF calc setups 係粗略估算，建議人手確認先落單

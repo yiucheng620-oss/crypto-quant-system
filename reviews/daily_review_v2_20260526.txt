@@ -1,0 +1,66 @@
+# 🔧 每日自動優化引擎 v2 報告 — 2026-05-26 08:00 HKT
+
+## 📊 交易統計 (7日)
+- Engines: 5 | Closed: 30 | P&L: $-22.10
+
+## ⚡ 今日參數優化
+- ✅ [btc] `STOP_LOSS_ATR_MULT`: 2.5 → 4.0
+  _🚨 AGGRESSIVE WHIPSAW: 全部 1 trades SL out, avg hold 4.7min → STOP_LOSS_ATR_MULT 太窄，大幅放寬 3x_
+- ✅ [eth] `STOP_LOSS_ATR_MULT`: 2.5 → 4.0
+  _🚨 AGGRESSIVE WHIPSAW: 全部 3 trades SL out, avg hold 4.6min → STOP_LOSS_ATR_MULT 太窄，大幅放寬 3x_
+
+## ⚖️ 策略權重調整
+- [btc] 1.00 → 0.92 — P&L=$-0.79, WR=0.0% → weight 1.00→0.92
+- [eth] 1.00 → 0.80 — P&L=$-18.01, WR=0.0% → weight 1.00→0.80
+- [gold] 1.00 → 0.97 — P&L=$-0.30, WR=0.0% → weight 1.00→0.97
+- [indices] 1.00 → 0.80 — P&L=$-3.00, WR=0.0% → weight 1.00→0.80
+
+## 🤖 Gemini 結構化行動
+- ℹ️ [btc] `STOP_LOSS_ATR_MULT`: 4.0 → 4.0
+  _No change needed (already 4.0)_
+- ℹ️ [eth] `STOP_LOSS_ATR_MULT`: 4.0 → 4.0
+  _No change needed (already 4.0)_
+- ✅ [eth] `_weight`: 0.8 → 0.8
+  _勝率0%且絕對虧損額最大，必須大幅降低權重作防禦_
+- ✅ [indices] `_weight`: 0.8 → 0.8
+  _9筆多單全敗且66.7%為時間止損，顯示上升動能枯竭，需降低敞口_
+
+---
+## 🧠 Gemini 3.1 Pro 戰略分析
+
+```json
+{
+  "market_regime": "volatile",
+  "confidence": "HIGH",
+  "actions": [
+    {
+      "type": "adjust_stop",
+      "target": "btc",
+      "value": 4.0,
+      "reason": "空單持倉不足5分鐘即100%被掃損，需大幅放寬ATR倍數以過濾極端雜訊"
+    },
+    {
+      "type": "adjust_stop",
+      "target": "eth",
+      "value": 4.0,
+      "reason": "與BTC同樣遭遇極速掃損，顯示市場波動劇烈，需放寬止損空間"
+    },
+    {
+      "type": "adjust_weight",
+      "target": "eth",
+      "value": 0.8,
+      "reason": "勝率0%且絕對虧損額最大，必須大幅降低權重作防禦"
+    },
+    {
+      "type": "adjust_weight",
+      "target": "indices",
+      "value": 0.8,
+      "reason": "9筆多單全敗且66.7%為時間止損，顯示上升動能枯竭，需降低敞口"
+    }
+  ],
+  "analysis": "全引擎勝率為零，顯示現有策略方向與當前市況完全脫節。加密貨幣空單在5分鐘內極速被掃損，極可能遭遇突發性軋空或惡意洗盤（Whipsaw）；傳統指數多單平均持倉超過4小時卻多數超時離場，反映市場缺乏實質上漲動能。短期內必須全面轉向防禦，降低高虧損引擎權重，並放寬加密貨幣止損以應對異常波動。"
+}
+```
+
+---
+_參數改動已直接套用到 engine source files。Changelog: /home/yiucheng620/workspace/reviews/param_changelog.json_

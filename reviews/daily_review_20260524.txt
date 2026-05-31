@@ -1,0 +1,12 @@
+# 🔧 每日自動優化報告 — 2026-05-24 08:00 HKT
+
+## 📊 交易統計 (7日)
+- Engines: 0 | Closed: 0 | P&L: $+0.00
+
+---
+## 🧠 Gemini 3.1 Pro (free) 戰略分析
+
+數據不足（少過 2 個 closed trades），跳過 Gemini 分析。
+
+---
+_參數改動已直接套用到 engine source files。Changelog: /home/yiucheng620/workspace/reviews/param_changelog.json_

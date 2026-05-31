@@ -1,0 +1,46 @@
+## 🔥 新聞驅動推薦
+
+| TICKER | 方向 | Catalyst (催化劑) | 信心 | 原因 |
+| :--- | :--- | :--- | :--- | :--- |
+| **DELL** | **LONG** | 驚人財報與國防大單 | **HIGH** | **Dell Technologies (DELL)** 盤後公布第一季財報極度亮眼，營收同比暴增 88% 至 438.4 億美元（遠超預期的 354.3 億美元），調整後 EPS 達 $4.86（預期僅 $2.94）。核心增長來自 AI 伺服器與數據中心業務（同比飆升 181%），加上獲得五角大廈 97 億美元的軟體合約支持，盤後股價狂飆 26%。在 AI 基礎設施需求狂熱下，DELL 的上行空間依然巨大。 |
+| **AMZN** | **LONG** | 與 Snowflake 簽署 60 億美元巨額協議 | **HIGH** | 雲端數據庫龍頭 Snowflake (SNOW) 財報亮眼並暴漲 36%，其核心催化劑是與 **Amazon (AMZN)** 達成了高達 60 億美元的深度合作協議。這項協議將直接鎖定 AWS 的長期雲端與 AI 算力消耗，大幅鞏固亞馬遜在雲端運算（Cloud）與企業 AI 部署上的霸主地位，為其帶來極其穩固的經常性收入（ARR）。 |
+| **MSFT** | **LONG** | 自研 AI 模型部署與券商看好 | **HIGH** | **Microsoft (MSFT)** 今日逆市上漲 3.4%。市場對微軟計劃在內部部署自研編碼 AI 模型（In-house Coding AI Models）反應非常正面，此舉能有效降低對 OpenAI 的算力依賴並控制成本。加上華爾街分析師普遍對微軟的 AI 變現能力維持高度樂觀，資金重回微軟避險。 |
+| **CRM** | **SHORT** | AI 資本開支過重拖累利潤率 | **MED** | **Salesforce (CRM)** 雖然昨日公布的整體業績尚可，但今日股價卻出現回吐壓力。市場資金目前對軟體巨頭的「重度 AI 研發與資本開支」產生審慎情緒，憂慮過高的 AI 投入會在中短期內侵蝕利潤率，且短期內難以看到爆發性收入。在資金偏好硬體（如 DELL、NVDA）的背景下，CRM 短期面臨估值修正壓力。 |
+
+---
+
+## ⚠️ 風險警示
+
+*   **高通膨與利率高企風險：** 今日公布的 4 月個人消費支出（PCE）物價指數同比上漲 3.8%，創下近三年來新高。油價上漲推動的黏性通膨，基本粉碎了市場對聯準會（Fed）今年降息的幻想，甚至有經濟學家預測下一步可能需要升息。**應避開高債務、對利率極度敏感的公用事業（Utilities）及中小型地產板塊。**
+*   **地緣政治與航運風險：** 雖然市場傳出美伊可能達成 60 天臨時停火協議的謠言，一度令油價短暫回落，但中東局勢依然極度脆弱（如伊朗襲擊美軍基地、科威特攔截導彈等）。**應暫時避開高度依賴低油價的郵輪股（如 NCLH）及航空股（如 DAL）。**
+
+---
+
+## 📊 市場情緒
+
+*   **整體判斷：偏向 Risk-on（風險偏好強勁，但呈現雙向波動）**
+    *   儘管 PCE 通膨數據創三年新高，且中東局勢動盪，但美股市場表現出極強的韌性。在美伊潛在停火傳聞及強勁企業盈利（特別是 DELL、SNOW、BBY、DLTR）的推動下，S&P 500 與 Nasdaq 雙雙逆勢創下歷史新高。這顯示出「盈利驅動」戰勝了「通膨擔憂」，市場情緒依然由 AI 科技浪潮主導。
+*   **最強板塊：** **科技/半導體/硬體基礎設施（Tech Hardware & AI）**（由 DELL、SNOW、MSFT 領漲）、**部分業績超預期的零售板塊**（如 Dollar Tree DLTR、Best Buy BBY）。
+*   **最弱板塊：** **航空與郵輪板塊**（受高油價與地緣衝突陰霾拖累）、**部分 AI 變現不明顯且資本開支巨大的傳統軟體股**。
+
+📎 Sources:
+- thestreet.com: https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQGr1rYGP3p7W8G1ourOckGR1KZfA8xl3
+- youtube.com: https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQG5P7BPSg1Ar555F6TWEQoj-NRl7NyGt
+- fool.com: https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQHe9angN5HECOY2rWjN9SgURarWrU5W7
+- fool.com: https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQEC_9JrsY6oVQ4HW75jnZ8hzJbxoSrej
+- latimes.com: https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQFVadtfJsqRIqlfAXAmf9sCJscHvje0o
+
+
+## 📐 Trading Setups
+
+| Ticker | 方向 | Entry | SL | TP | RR | ATR | Trend | 來源 |
+|:--|:--|--:|--:|--:|--:|--:|:--|:--|
+| **DELL** | LONG | $317.05 | $289.42 | $372.31 | 2.0 | $18.41 | 📈 上升 | YF calc |
+| **AMZN** | LONG | $274.00 | $264.46 | $293.07 | 2.0 | $6.34 | 📈 上升 | YF calc |
+| **SNOW** | LONG | $239.20 | $220.61 | $276.37 | 2.0 | $12.39 | 📈 上升 | YF calc |
+| **MSFT** | LONG | $424.22 | $405.00 | $480.00 | 2.9 | $0.00 | ? | Screener |
+| **CRM** | LONG | $176.17 | $164.94 | $198.63 | 2.0 | $7.49 | 📉 下降 | YF calc |
+| **NVDA** | LONG | $211.99 | $195.00 | $260.00 | 2.8 | $0.00 | ? | Screener |
+
+> **Screener** = technical screener 計算 | **YF calc** = 快速 yfinance ATR-based (1.5x SL / 3x TP)
+> ⚠️ YF calc setups 係粗略估算，建議人手確認先落單

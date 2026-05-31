@@ -1,0 +1,45 @@
+## 🔥 新聞驅動推薦
+
+| TICKER | 方向 | Catalyst (催化劑) | 信心 | 原因 |
+| :--- | :--- | :--- | :--- | :--- |
+| **DELL** | **LONG (多頭)** | 財報超預期、上調全年指引 | **HIGH (高)** | Dell 第一季度利潤遠超預期，並因 AI 服務器需求極度強勁而大幅上調全年營收指引。週五股價暴漲近 33%，AI 硬件（AI Hardware）的實質性業績兌現期已經開啟，資金正瘋狂湧入 AI 基礎設施板塊。 |
+| **MSFT** | **LONG (多頭)** | 自研 AI 降低成本、Azure 增長加速 | **HIGH (高)** | 微軟週五股價飆升 5.45% 至 450.24 美元。公司計劃推出更多內部自研 AI 模型以降低營運成本，且其 AI 年化收入已突破 370 億美元。在 Dell 業績帶動的 AI 狂熱下，微軟作為 AI 軟件與雲端基礎設施龍頭，估值溢價具備極強支撐。 |
+| **CRM** | **SHORT (空頭)** | 業績指引指引疲弱、AI 蠶食傳統 SaaS 需求 | **MED (中)** | Salesforce（CRM）第二季營收指引低於華爾街預期，引發市場對「SaaS 終結（SaaSpocalypse）」的擔憂——即生成式 AI 正在縮減企業對傳統軟體授權與人頭計費（per-seat）的需求。儘管公司宣布 270 億美元巨額回購，但其核心業務面臨 AI 工具（如 Anthropic 和 OpenAI）的結構性顛覆風險，短期股價承壓。 |
+| **AMZN** | **LONG (多頭)** | 貝佐斯重申 AI 戰略、併購 Globalstar 獲進展 | **MED (中)** | 創辦人貝佐斯近期強調 AI 已成為亞馬遜所有業務的「核心神經」，AWS 迎來 15 個季度以來最快增長。此外，亞馬遜收購衛星通訊公司 Globalstar（GSAT）的計劃持續推進，將為其 Project Kuiper 衛星網絡注入直連手機（D2D）功能，戰略版圖進一步擴大，具備長線重估空間。 |
+
+---
+
+## ⚠️ 風險警示
+*   **地緣政治與通脹反覆（美伊停火協議變數）：** 市場近期創下歷史新高，很大程度得益於美國與伊朗有望達成 60 天停火協議的預期，這使國際油價（Brent 原油）回落至 92 美元附近。然而，雙方官方消息仍有反覆，一旦停火談判破裂，油價可能再度飆升，加劇已處於三年高位的美國通脹壓力，並推高 10 年期美債收益率逼近 5% 關口，這將對高估值成長股構成致命打擊。
+*   **避開傳統防禦性/消費板塊：** 儘管大盤創新高，但資金高度集中在科技股，Costco（COST）及 Walmart（WMT）等必選消費股（Consumer Staples）在上週五逆勢下跌，市場呈現極端的 Risk-on 科技獨大行情，防禦性板塊失血嚴重。
+
+---
+
+## 📊 市場情緒
+*   **整體判斷：** **極度 Risk-on（冒險情緒高漲）**
+    *   標普 500 指數與納斯達克指數連續刷新歷史新高，標普 500 創下自 1985 年以來罕見的**連續 9 週上漲**紀錄。
+    *   儘管有通脹隱憂，但 Dell 的強勁業績再次向市場證明「AI 基礎設施開支並非泡沫，而是實打實的業績」，推動市場忽略宏觀利空，維持多頭攻勢。
+*   **最強板塊：** **科技/AI 硬件與半導體**（Dell +33%、微軟 +5.4%、Broadcom +4.7%）。
+*   **最弱板塊：** **必選消費（Consumer Staples）**（Costco、Walmart 逆勢走弱） 及**傳統應用軟體（SaaS）**。
+
+📎 Sources:
+- fool.com: https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQFH9PwE3gNuWyIhYCP75lms6ci5Exb6V
+- theedgesingapore.com: https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQHwZaWNu0RnBpix9AMNWQ_jRmdRlpEEj
+- sophiccapital.com: https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQE1aX8-pl5JQF7N-mNe1yNptMsHbr4RT
+- businesstimes.com.sg: https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQFj1VJnzugbq0cx1-LUhah4nt5bnlGyn
+- tradingkey.com: https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQHC5xP5_6fPpyumsjZFxy4uSf2rKYr89
+
+
+## 📐 Trading Setups
+
+| Ticker | 方向 | Entry | SL | TP | RR | ATR | Trend | 來源 |
+|:--|:--|--:|--:|--:|--:|--:|:--|:--|
+| **DELL** | LONG | $420.91 | $384.92 | $492.89 | 2.0 | $24.01 | 📈 上升 | YF calc |
+| **MSFT** | LONG | $450.24 | $432.75 | $485.22 | 2.0 | $11.66 | 📈 上升 | YF calc |
+| **CRM** | LONG | $191.10 | $178.95 | $215.41 | 2.0 | $8.10 | 📈 上升 | YF calc |
+| **AMZN** | LONG | $270.64 | $261.02 | $289.88 | 2.0 | $6.42 | 📈 上升 | YF calc |
+| **COST** | LONG | $956.32 | $916.87 | $1,035.22 | 2.0 | $26.25 | 📉 下降 | YF calc |
+| **WMT** | LONG | $115.75 | $110.38 | $126.48 | 2.0 | $3.58 | 📉 下降 | YF calc |
+
+> **Screener** = technical screener 計算 | **YF calc** = 快速 yfinance ATR-based (1.5x SL / 3x TP)
+> ⚠️ YF calc setups 係粗略估算，建議人手確認先落單

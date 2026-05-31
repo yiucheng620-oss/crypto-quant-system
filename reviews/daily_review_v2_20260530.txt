@@ -1,0 +1,63 @@
+# 🔧 每日自動優化引擎 v2 報告 — 2026-05-30 08:30 HKT
+
+## 📊 交易統計 (7日)
+- Engines: 7 | Closed: 53 | P&L: $+108.99
+
+## ⚡ 今日參數優化
+- ✅ [gold] `TAKE_PROFIT_PCT`: 0.05 → 0.030000000000000002
+  _AGGRESSIVE: TP hit rate 0%, but win rate 11.1% → TP 太遠，大幅縮窄 2x_
+
+## ⚖️ 策略權重調整
+- [btc] 1.58 → 1.90 — P&L=$+35.39, WR=40.0% → weight 1.58→1.90
+- [gold] 0.50 → 0.40 — P&L=$-4.66, WR=11.1% → weight 0.50→0.40
+- [indices] 0.41 → 0.33 — P&L=$-5.54, WR=3.7% → weight 0.41→0.33
+
+## 🤖 Gemini 結構化行動
+- ℹ️ [indices] `RISK_PER_TRADE_PCT`: ? → 0.5
+  _Param RISK_PER_TRADE_PCT not in ENGINE_PARAMS for indices_
+- ✅ [gold] `TAKE_PROFIT_PCT`: 0.030000000000000002 → 0.03
+  _系統已建議縮窄TP。勝率僅11.1%且TimeStop率高達44.4%，目標價過遠導致獲利回吐。_
+- ✅ [eth] `TRAILING_ACTIVATION_PCT`: 0.02 → 0.04
+  _做空盈虧比極高(均贏$100 vs 均輸$4)，但止損率達85.7%。建議優化移動止損，在極端行情中鎖定部分暴利。_
+- ✅ [btc] `_weight`: 1.896 → 1.9
+  _勝率(40%)與盈虧表現最穩定，確認系統建議，增加資金權重至1.90以捕捉加密貨幣趨勢。_
+
+---
+## 🧠 Gemini 3.1 Pro 戰略分析
+
+```json
+{
+  "market_regime": "volatile",
+  "confidence": "MED",
+  "actions": [
+    {
+      "type": "adjust_risk",
+      "target": "indices",
+      "value": 0.5,
+      "reason": "勝率極低(3.7%)且交易頻繁(27筆)，近半觸發TimeStop，顯示陷入震盪消耗戰，需立即減半風險敞口。"
+    },
+    {
+      "type": "adjust_tp",
+      "target": "gold",
+      "value": 0.03,
+      "reason": "系統已建議縮窄TP。勝率僅11.1%且TimeStop率高達44.4%，目標價過遠導致獲利回吐。"
+    },
+    {
+      "type": "adjust_trailing",
+      "target": "eth",
+      "value": 0.05,
+      "reason": "做空盈虧比極高(均贏$100 vs 均輸$4)，但止損率達85.7%。建議優化移動止損，在極端行情中鎖定部分暴利。"
+    },
+    {
+      "type": "adjust_weight",
+      "target": "btc",
+      "value": 1.9,
+      "reason": "勝率(40%)與盈虧表現最穩定，確認系統建議，增加資金權重至1.90以捕捉加密貨幣趨勢。"
+    }
+  ],
+  "analysis": "1. 市場結構：加密市場呈現高波動的長尾趨勢（ETH空頭以極低勝率換取巨大盈虧比，BTC多空皆宜）；傳統資產（Gold, Indices）陷入無方向震盪，頻繁觸發TimeStop。 2. 緊急調整：Indices 引擎在做多方向被嚴重消耗（27戰僅1勝），需立即降倉或暫停；Gold 需縮窄 TP 以適應窄幅震盪。 3. 資金配置：資金應從表現疲軟的 TradFi (Gold, Indices) 轉移至具備動能的 Crypto (BTC)。 4. 風險警告：整體投資組合勝率極低（多數引擎 < 15%），P&L 高度依賴 ETH 的極端單筆暴利。若加密市場波動率收斂，整體帳戶將面臨持續的止損放血，需密切監控勝率變化。"
+}
+```
+
+---
+_參數改動已直接套用到 engine source files。Changelog: /home/yiucheng620/workspace/reviews/param_changelog.json_

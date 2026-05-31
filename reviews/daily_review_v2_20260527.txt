@@ -1,0 +1,82 @@
+# 🔧 每日自動優化引擎 v2 報告 — 2026-05-27 08:00 HKT
+
+## 📊 交易統計 (7日)
+- Engines: 5 | Closed: 30 | P&L: $+76.58
+
+## ⚡ 今日參數優化
+- ✅ [eth] `TAKE_PROFIT_PCT`: 0.05 → 0.030000000000000002
+  _AGGRESSIVE: TP hit rate 0%, but win rate 20.0% → TP 太遠，大幅縮窄 2x_
+- ✅ [gold] `STOP_LOSS_PCT`: 0.02 → 0.03
+  _Win rate 0.0% (<30%), avg loss $-0.69 >> avg win $0 → STOP_LOSS_PCT 太窄_
+
+## ⚖️ 策略權重調整
+- [btc] 0.92 → 1.10 — P&L=$+13.08, WR=100.0% → weight 0.92→1.10
+- [equities] 1.00 → 0.80 — P&L=$-6.19, WR=0.0% → weight 1.00→0.80
+- [gold] 0.97 → 0.78 — P&L=$-4.84, WR=0.0% → weight 0.97→0.78
+- [indices] 0.80 → 0.64 — P&L=$-5.24, WR=0.0% → weight 0.80→0.64
+
+## 🤖 Gemini 結構化行動
+- ✅ [btc] `_weight`: 1.105 → 1.1
+  _單筆做空獲利且勝率100%，順勢微調增加權重，但樣本極少需保持警惕。_
+- ✅ [eth] `TAKE_PROFIT_PCT`: 0.030000000000000002 → 0.03
+  _盈虧比極高但TP觸發率為0%，縮窄TP至0.03以提高鎖定利潤機率，並避開14:00劣勢時段。_
+- ℹ️ [gold] `STOP_LOSS_PCT`: 0.03 → 0.03
+  _No change needed (already 0.03)_
+- ✅ [gold] `_weight`: 0.776 → 0.78
+  _黃金陷入無方向震盪，降低權重並避開21:00劣勢時段。_
+- ✅ [indices] `_weight`: 0.64 → 0.64
+  _16筆做多全敗，TimeStop率達68.8%，市場完全缺乏上漲動能，大幅削減權重。_
+- ✅ [equities] `_weight`: 0.8 → 0.8
+  _做多失敗，跟隨大盤(indices)弱勢，防禦性降低權重。_
+
+---
+## 🧠 Gemini 3.1 Pro 戰略分析
+
+```json
+{
+  "market_regime": "ranging",
+  "confidence": "MED",
+  "actions": [
+    {
+      "type": "adjust_weight",
+      "target": "btc",
+      "value": 1.10,
+      "reason": "單筆做空獲利且勝率100%，順勢微調增加權重，但樣本極少需保持警惕。"
+    },
+    {
+      "type": "adjust_tp",
+      "target": "eth",
+      "value": 0.03,
+      "reason": "盈虧比極高但TP觸發率為0%，縮窄TP至0.03以提高鎖定利潤機率，並避開14:00劣勢時段。"
+    },
+    {
+      "type": "adjust_stop",
+      "target": "gold",
+      "value": 0.03,
+      "reason": "勝率0%且TimeStop率高達57.1%，擴闊止損至3%以應對震盪市況避免過早被洗出。"
+    },
+    {
+      "type": "adjust_weight",
+      "target": "gold",
+      "value": 0.78,
+      "reason": "黃金陷入無方向震盪，降低權重並避開21:00劣勢時段。"
+    },
+    {
+      "type": "adjust_weight",
+      "target": "indices",
+      "value": 0.64,
+      "reason": "16筆做多全敗，TimeStop率達68.8%，市場完全缺乏上漲動能，大幅削減權重。"
+    },
+    {
+      "type": "adjust_weight",
+      "target": "equities",
+      "value": 0.80,
+      "reason": "做多失敗，跟隨大盤(indices)弱勢，防禦性降低權重。"
+    }
+  ],
+  "analysis": "目前市場呈現「傳統資產震盪陰跌、加密貨幣單邊下跌」的結構。指數(16筆做多)與黃金勝率皆為0%，且TimeStop觸發率極高(57%-68%)，反映傳統市場缺乏推進動能，陷入絞肉機行情。相反，加密貨幣做空策略(ETH, BTC)成功捕捉跌勢，ETH雖高止損率(80%)但單筆暴利(均贏$100 vs 均輸$5)撐起整體利潤。資金應由傳統多頭撤出，轉向加密貨幣空頭，同時傳統資產需依賴縮減部位及優化時效管理(避開21:00等劣勢時段)來控制風險。"
+}
+```
+
+---
+_參數改動已直接套用到 engine source files。Changelog: /home/yiucheng620/workspace/reviews/param_changelog.json_

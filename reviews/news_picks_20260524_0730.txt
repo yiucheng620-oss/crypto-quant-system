@@ -1,0 +1,39 @@
+## 🔥 新聞驅動推薦
+
+| TICKER | 方向 | Catalyst (催化劑) | 信心 | 原因 |
+| :--- | :--- | :--- | :--- | :--- |
+| **EL** | LONG | 終止與 Puig 合併談判，專注獨立轉型 | **HIGH** | 雅詩蘭黛（EL）週五暴漲 11.9%。公司宣布終止與西班牙香水巨頭 Puig 的合併談判，決定保持獨立並專注於「Beauty Reimagined」重塑戰略（包括剝離 Too Faced、Smashbox 等非核心品牌）。Piper Sandler 亦給予「超配」評級，目標價 $95，市場對其獨立轉型及利潤率改善信心大增。 |
+| **WDAY** | LONG | Q1 業績超預期，上調全年利潤率指引 | **HIGH** | Workday 週五收漲 5.2%（盤中一度飆升 12%）。第一財季營收同比增長 13.5% 至 25.4 億美元，非 GAAP EPS 達 $2.66，均超預期。公司更將全年非 GAAP 營運利潤率指引上調至 30.5%，顯示企業級 AI 代理（AI Agents）採用率加速，SaaS 板塊迎來估值修復。 |
+| **NVDA** | LONG | Q1 業績爆表，AI 需求依然強勁 | **MED** | 輝達發布超強 Q1 財報，營收達 816 億美元（同比增 85%），淨利潤 583 億美元（翻了三倍），Q2 營收指引高達 910 億美元。雖然股價因「預期過高」及電網、地緣政治等瓶頸短期高位震盪，但四大雲端巨頭 2026 年資本開支預計達 7000 億美元，基本面依然無敵，回調即是買入機會。 |
+| **TSLA** | SHORT | 中國 FSD 改名「輔助駕駛」，EV 需求仍疲弱 | **MED** | 特斯拉在中國將「FSD（全自動駕駛）」改名為「Tesla Assisted Driving（特斯拉輔助駕駛）」，反映監管壓力及技術仍停留在 L2 級別的現實。雖然近期微調 Model Y 高配版售價，但全球 EV 需求放緩大趨勢未變，估值依然偏高。 |
+
+---
+
+## ⚠️ 風險警示
+*   **今日要避開嘅板塊/事件**：**普通消費必需品及零售板塊（除特定業績爆發股外）**。
+*   **避開原因**：密歇根大學 5 月消費者信心指數跌至歷史新低 44.8（前值 49.8），主因是美伊衝突導致油價高企，消費者對未來一年通脹預期升至 4.8%。美債收益率（10年期 4.57%，2年期 4.13%）維持高位，高通脹與低信心的「滯脹」隱憂將壓制普通消費板塊。
+
+---
+
+## 📊 市場情緒
+*   **整體 risk-on/off 判斷**：**偏向 Risk-on（風險偏好擴張）**。標普 500 指數週五收漲 0.4%，錄得**連續第八週上漲**，創下 2023 年底以來最長連漲紀錄。雖然宏觀數據（消費者信心）極差，但美債收益率企穩及強勁的企業盈利（AI 驅動）繼續支撐美股「無視利空」上行。
+*   **最強板塊**：**科技/SaaS**（Workday、Zoom 財報亮眼帶動）、**高端消費/美妝**（Estée Lauder 暴漲帶動）。
+*   **最弱板塊**：**中概股**（因北京監管跨境券商而集體走弱）、**傳統公用事業/高負債板塊**（受制於美債收益率維持高位）。
+
+📎 Sources:
+- bnnbloomberg.ca: https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQGMOeNgFwu9u-4Hgbyrdhf5eYkwa8QP9
+- gurufocus.com: https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQEyDyHdMhe1ihqdoVrTtGo3SDhpKgDJD
+- perplexity.ai: https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQG-l8yXxuozF4CySlI66PVSLzBJMbZ7x
+- seekingalpha.com: https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQGz7qj5gbRyO2XJTmCObIH06S3D6_P0R
+- xtb.com: https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQE45CcPBHJIKeb6IulK3TslcZ7JMducc
+
+
+## 📐 Trading Setups
+
+| Ticker | 方向 | Entry | SL | TP | RR | ATR | Trend | 來源 |
+|:--|:--|--:|--:|--:|--:|--:|:--|:--|
+| **NVDA** | LONG | $215.33 | $202.89 | $240.20 | 2.0 | $8.29 | 📈 上升 | YF calc |
+| **TSLA** | LONG | $426.01 | $398.72 | $480.58 | 2.0 | $18.20 | 📈 上升 | YF calc |
+
+> **Screener** = technical screener 計算 | **YF calc** = 快速 yfinance ATR-based (1.5x SL / 3x TP)
+> ⚠️ YF calc setups 係粗略估算，建議人手確認先落單

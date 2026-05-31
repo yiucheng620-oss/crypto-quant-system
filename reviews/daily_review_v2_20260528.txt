@@ -1,0 +1,112 @@
+# 🔧 每日自動優化引擎 v2 報告 — 2026-05-28 08:00 HKT
+
+## 📊 交易統計 (7日)
+- Engines: 5 | Closed: 45 | P&L: $+111.12
+
+## ⚡ 今日參數優化
+- ✅ [btc] `TAKE_PROFIT_PCT`: 0.05 → 0.030000000000000002
+  _AGGRESSIVE: TP hit rate 0%, but win rate 40.0% → TP 太遠，大幅縮窄 2x_
+- ✅ [btc] `TRAILING_ACTIVATION_PCT`: 0.02 → 0.015
+  _Trailing 從未 activate, 但 win rate 40.0% → 降低 activation threshold_
+- ✅ [equities] `TAKE_PROFIT_PCT`: 0.1 → 0.060000000000000005
+  _AGGRESSIVE: TP hit rate 0%, but win rate 50.0% → TP 太遠，大幅縮窄 2x_
+- ✅ [eth] `TAKE_PROFIT_PCT`: 0.03 → 0.02
+  _AGGRESSIVE: TP hit rate 0%, but win rate 14.3% → TP 太遠，大幅縮窄 2x_
+- ✅ [gold] `STOP_LOSS_PCT`: 0.03 → 0.04
+  _Win rate 0.0% (<30%), avg loss $-0.69 >> avg win $0 → STOP_LOSS_PCT 太窄_
+
+## ⚖️ 策略權重調整
+- [btc] 1.10 → 1.32 — P&L=$+35.39, WR=40.0% → weight 1.10→1.32
+- [equities] 0.80 → 0.96 — P&L=$+9.14, WR=50.0% → weight 0.80→0.96
+- [gold] 0.78 → 0.62 — P&L=$-4.84, WR=0.0% → weight 0.78→0.62
+- [indices] 0.64 → 0.51 — P&L=$-3.23, WR=4.2% → weight 0.64→0.51
+
+## 🤖 Gemini 結構化行動
+- ✅ [btc] `TAKE_PROFIT_PCT`: 0.030000000000000002 → 0.03
+  _勝率達40%但TP觸發率為0%，需大幅縮窄TP以鎖定利潤_
+- ℹ️ [btc] `TRAILING_ACTIVATION_PCT`: 0.015 → 0.015
+  _No change needed (already 0.015)_
+- ✅ [btc] `_weight`: 1.32 → 1.32
+  _盈虧比極佳且表現強勢，增加權重放大優勢_
+- ✅ [equities] `TAKE_PROFIT_PCT`: 0.060000000000000005 → 0.06
+  _勝率50%但未觸發TP，下調目標價以適應實際波幅_
+- ✅ [equities] `_weight`: 0.96 → 0.96
+  _表現穩定且盈虧比良好，溫和增加資金配置_
+- ℹ️ [eth] `TAKE_PROFIT_PCT`: 0.02 → 0.02
+  _No change needed (already 0.02)_
+- ℹ️ [gold] `STOP_LOSS_PCT`: 0.04 → 0.04
+  _No change needed (already 0.04)_
+- ✅ [gold] `_weight`: 0.624 → 0.62
+  _持續虧損且TimeStop率高達57%，需降低資金佔比防禦風險_
+- ✅ [indices] `_weight`: 0.512 → 0.51
+  _勝率極低(4.2%)且陷入震盪(超時率54%)，大幅削減權重_
+
+---
+## 🧠 Gemini 3.1 Pro 戰略分析
+
+```json
+{
+  "market_regime": "volatile",
+  "confidence": "HIGH",
+  "actions": [
+    {
+      "type": "adjust_tp",
+      "target": "btc",
+      "value": 0.03,
+      "reason": "勝率達40%但TP觸發率為0%，需大幅縮窄TP以鎖定利潤"
+    },
+    {
+      "type": "adjust_trailing",
+      "target": "btc",
+      "value": 0.015,
+      "reason": "追蹤止盈從未啟動，降低激活門檻以保護極佳的盈虧比"
+    },
+    {
+      "type": "adjust_weight",
+      "target": "btc",
+      "value": 1.32,
+      "reason": "盈虧比極佳且表現強勢，增加權重放大優勢"
+    },
+    {
+      "type": "adjust_tp",
+      "target": "equities",
+      "value": 0.06,
+      "reason": "勝率50%但未觸發TP，下調目標價以適應實際波幅"
+    },
+    {
+      "type": "adjust_weight",
+      "target": "equities",
+      "value": 0.96,
+      "reason": "表現穩定且盈虧比良好，溫和增加資金配置"
+    },
+    {
+      "type": "adjust_tp",
+      "target": "eth",
+      "value": 0.02,
+      "reason": "勝率僅14.3%且SL率極高，極度依賴單次暴利，需縮窄TP改善勝率"
+    },
+    {
+      "type": "adjust_stop",
+      "target": "gold",
+      "value": 0.04,
+      "reason": "勝率0%且頻繁止損，適度放寬SL避免過早被洗出"
+    },
+    {
+      "type": "adjust_weight",
+      "target": "gold",
+      "value": 0.62,
+      "reason": "持續虧損且TimeStop率高達57%，需降低資金佔比防禦風險"
+    },
+    {
+      "type": "adjust_weight",
+      "target": "indices",
+      "value": 0.51,
+      "reason": "勝率極低(4.2%)且陷入震盪(超時率54%)，大幅削減權重"
+    }
+  ],
+  "analysis": "市場呈現極端分化。加密貨幣（BTC/ETH）具備高波動與極高盈虧比，依賴低勝率的單邊暴利；傳統市場（Gold/Indices）陷入嚴重震盪，超時出場率極高（>50%）。資金應順勢向BTC與Equities傾斜，大幅削減Gold/Indices權重。當前全線Engine的TP觸發率均為0%，顯示原設定目標過遠，需緊急且全面下調TP及Trailing門檻以鎖定利潤。風險警告：Indices在深夜至凌晨時段頻繁虧損，ETH做空止損率高達85.7%，需警惕假突破及震盪消耗。"
+}
+```
+
+---
+_參數改動已直接套用到 engine source files。Changelog: /home/yiucheng620/workspace/reviews/param_changelog.json_

@@ -1,0 +1,53 @@
+2026年5月25日（星期一）為美國陣亡將士紀念日（Memorial Day），美股休市一天。然而，美股期指、歐洲及亞洲市場照常交易，且市場出現了極具方向性的重大利好催化劑。以下為今日最新市場動態與美股板塊策略分析：
+
+---
+
+## 🔥 新聞驅動推薦
+
+### 1. AMD | 方向：LONG | Catalyst：加碼台灣生態圈與 2nm 先進製程產能 | 信心：HIGH
+* **原因**：AMD 執行長蘇姿丰近日訪台，確認旗下第 6 代 EPYC 「Venice」處理器將採用台積電（TSMC）最先進的 2nm 製程技術，並承諾在 2029 年前向台灣 AI 生態圈投資超過 100 億美元以擴大先進封裝產能。今日台股與亞太晶片股受此刺激集體暴漲，AMD 在 AI 推理（Inference）與代理人 AI（Agentic AI）需求爆發下，產能瓶頸有望獲得實質解決，後市極具上攻動能。
+
+### 2. XOM (埃克森美孚) / CVX (雪佛龍) | 方向：SHORT | Catalyst：美伊和談進展順利，原油價格暴跌 | 信心：HIGH
+* **原因**：美國總統特朗普與政府官員今日表示，美伊結束戰爭及重開霍爾木茲海峽的談判取得「建設性進展」。此消息引發全球原油市場巨震，布蘭特原油（Brent）與 WTI 原油期貨單日暴跌近 6%，直逼每桶 90 美元關口。原油價格失守將直接壓制傳統能源巨頭的利潤預期，短期內能源板塊將面臨極大拋售壓力。
+
+### 3. NVDA (輝達) | 方向：LONG | Catalyst：Q1 財報超預期、Blackwell 售罄與股權投資價值顯現 | 信心：MED
+* **原因**：輝達上周公布的 FQ1 財報再次創下 816 億美元的驚人營收（年增 85%），Blackwell 晶片已全數售罄。雖然財報後股價出現短暫的「利好兌現」回調，但今日市場目光轉向輝達日益龐大的 AI 產業鏈股權投資組合，這被視為未來的隱形催化劑。隨著今日美股期指走高（Nasdaq 100 期指大漲 1.4%），輝達有望迅速收復失地。
+
+---
+
+## ⚠️ 風險警示
+
+* **避開板塊：傳統油氣與能源板塊（XOM, CVX, COP）**
+  * **原因**：美伊地緣政治局勢顯著降溫，霍爾木茲海峽若順利重開，將解除過去數月推高油價的溢價因素。原油價格今日已創下近期最大單日跌幅，能源股在未來數個交易日將持續承壓。
+* **關注事件：美債收益率與通脹預期**
+  * 雖然油價下跌有助於緩解通脹壓力，但聯儲局官員近期釋放鷹派信號（如 Waller 主張取消寬鬆傾向），美債收益率維持高位，仍是壓制高估值科技股的主要隱憂。
+
+---
+
+## 📊 市場情緒
+
+* **整體情緒：Risk-on（風險偏好強烈擴張）**
+  * **判斷依據**：中東和平談判取得突破性進展，油價大跌直接緩解了全球市場對「滯脹（Stagflation）」的擔憂。今日亞太股市集體狂歡（日經大漲 2.9%、台股創歷史新高），美股期指全面走高，市場避險情緒大幅消退，資金重回風險資產。
+* **最強板塊**：**半導體與 AI 硬件（Semiconductors & AI Hardware）**。受 AMD 產能擴張與台積電大漲刺激，晶片股板塊人氣最旺。
+* **最弱板塊**：**石油、天然氣與能源上游（Energy/Oil & Gas）**。
+
+📎 Sources:
+- morningstar.com: https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQHOZDIzeIXNvrx4a6JNxZmzm-FOLA6qY
+- bnnbloomberg.ca: https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQHkfHNh_opUqrB-8JTfUT7pnI2MQ9nZS
+- theedgesingapore.com: https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQEjKg4ujcEPA0_lidCZWhImUcAFe7JfR
+- perplexity.ai: https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQEgbJj9O6dtuQgKFKRtsbvHNvMjZ37i2
+- investing.com: https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQEeq8688z4vU4aSpWsoNsblWQVrMdEMI
+
+
+## 📐 Trading Setups
+
+| Ticker | 方向 | Entry | SL | TP | RR | ATR | Trend | 來源 |
+|:--|:--|--:|--:|--:|--:|--:|:--|:--|
+| **AMD** | LONG | $467.51 | $453.48 | $551.54 | 6.0 | $28.01 | 📈 上升 | Screener |
+| **XOM** | LONG | $154.92 | $150.27 | $167.58 | 2.7 | $4.22 | 📈 上升 | Screener |
+| **CVX** | LONG | $191.43 | $185.69 | $204.71 | 2.3 | $4.43 | 📊 盤整 | Screener |
+| **NVDA** | LONG | $215.33 | $202.89 | $240.20 | 2.0 | $8.29 | 📈 上升 | YF calc |
+| **COP** | LONG | $120.46 | $115.55 | $130.29 | 2.0 | $3.28 | 📈 上升 | YF calc |
+
+> **Screener** = technical screener 計算 | **YF calc** = 快速 yfinance ATR-based (1.5x SL / 3x TP)
+> ⚠️ YF calc setups 係粗略估算，建議人手確認先落單

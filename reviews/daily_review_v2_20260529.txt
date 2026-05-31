@@ -1,0 +1,100 @@
+# 🔧 每日自動優化引擎 v2 報告 — 2026-05-29 08:00 HKT
+
+## 📊 交易統計 (7日)
+- Engines: 7 | Closed: 50 | P&L: $+108.81
+
+## ⚡ 今日參數優化
+- ✅ [btc] `TAKE_PROFIT_PCT`: 0.03 → 0.02
+  _AGGRESSIVE: TP hit rate 0%, but win rate 40.0% → TP 太遠，大幅縮窄 2x_
+- ✅ [btc] `TRAILING_ACTIVATION_PCT`: 0.015 → 0.01
+  _Trailing 從未 activate, 但 win rate 40.0% → 降低 activation threshold_
+- ✅ [equities] `TAKE_PROFIT_PCT`: 0.06 → 0.05
+  _AGGRESSIVE: TP hit rate 0%, but win rate 50.0% → TP 太遠，大幅縮窄 2x_
+
+## ⚖️ 策略權重調整
+- [btc] 1.32 → 1.58 — P&L=$+35.39, WR=40.0% → weight 1.32→1.58
+- [equities] 0.96 → 1.15 — P&L=$+9.14, WR=50.0% → weight 0.96→1.15
+- [gold] 0.62 → 0.50 — P&L=$-4.84, WR=0.0% → weight 0.62→0.50
+- [indices] 0.51 → 0.41 — P&L=$-5.54, WR=3.7% → weight 0.51→0.41
+
+## 🤖 Gemini 結構化行動
+- ℹ️ [btc] `TAKE_PROFIT_PCT`: 0.02 → 0.02
+  _No change needed (already 0.02)_
+- ℹ️ [btc] `TRAILING_ACTIVATION_PCT`: 0.01 → 0.01
+  _No change needed (already 0.01)_
+- ✅ [btc] `_weight`: 1.584 → 1.58
+  _盈虧比優秀（均贏$19.77/均輸$1.39），順勢增加資金配置_
+- ℹ️ [equities] `TAKE_PROFIT_PCT`: 0.05 → 0.05
+  _No change needed (already 0.05)_
+- ✅ [equities] `_weight`: 1.152 → 1.15
+  _表現穩定且具備正期望值，微調提升權重_
+- ✅ [gold] `_weight`: 0.496 → 0.5
+  _勝率0%且時間止損率高達57.1%，走勢泥沼化，需降權_
+- ✅ [indices] `_weight`: 0.408 → 0.41
+  _27筆交易勝率僅3.7%，頻繁止損，需大幅降低曝險_
+- ℹ️ [indices] `recommendation`: ? → 0
+  _100%做多但表現極差，建議暫停多頭策略或檢討大盤趨勢濾網_
+
+---
+## 🧠 Gemini 3.1 Pro 戰略分析
+
+```json
+{
+  "market_regime": "volatile",
+  "confidence": "MED",
+  "actions": [
+    {
+      "type": "adjust_tp",
+      "target": "btc",
+      "value": 0.02,
+      "reason": "勝率達40%但從未觸發TP，需縮窄目標以鎖定利潤"
+    },
+    {
+      "type": "adjust_trailing",
+      "target": "btc",
+      "value": 0.01,
+      "reason": "Trailing未曾啟動，降低觸發門檻以保護浮盈"
+    },
+    {
+      "type": "adjust_weight",
+      "target": "btc",
+      "value": 1.58,
+      "reason": "盈虧比優秀（均贏$19.77/均輸$1.39），順勢增加資金配置"
+    },
+    {
+      "type": "adjust_tp",
+      "target": "equities",
+      "value": 0.05,
+      "reason": "勝率50%但TP過遠，縮窄2倍以提高資金周轉率"
+    },
+    {
+      "type": "adjust_weight",
+      "target": "equities",
+      "value": 1.15,
+      "reason": "表現穩定且具備正期望值，微調提升權重"
+    },
+    {
+      "type": "adjust_weight",
+      "target": "gold",
+      "value": 0.5,
+      "reason": "勝率0%且時間止損率高達57.1%，走勢泥沼化，需降權"
+    },
+    {
+      "type": "adjust_weight",
+      "target": "indices",
+      "value": 0.41,
+      "reason": "27筆交易勝率僅3.7%，頻繁止損，需大幅降低曝險"
+    },
+    {
+      "type": "recommend",
+      "target": "indices",
+      "value": 0,
+      "reason": "100%做多但表現極差，建議暫停多頭策略或檢討大盤趨勢濾網"
+    }
+  ],
+  "analysis": "市場呈現極端的兩極化波動。加密貨幣（BTC, ETH）盈虧比表現極佳，尤其是ETH全數做空靠單筆大賺覆蓋高止損率，具備強烈趨勢與波動特徵；相反，傳統市場（Gold, Indices）陷入無方向泥沼，Indices 27筆做多幾乎全軍覆沒，且伴隨大量時間止損（TimeStop），顯示策略完全逆勢或市場缺乏上行動能。建議資金全面向Crypto及Equities傾斜，並透過縮窄TP與Trailing保護利潤；Indices 必須立即停止盲目做多操作。"
+}
+```
+
+---
+_參數改動已直接套用到 engine source files。Changelog: /home/yiucheng620/workspace/reviews/param_changelog.json_

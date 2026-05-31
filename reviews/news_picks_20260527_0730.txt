@@ -1,0 +1,44 @@
+## 🔥 新聞驅動推薦
+
+| TICKER | 方向 | Catalyst (催化劑) | 信心 | 原因 |
+| :--- | :--- | :--- | :--- | :--- |
+| **MU** (Micron) | **LONG** (長倉) | 投行上調評級與目標價，市值首破萬億美元 | **HIGH** (高) | UBS（瑞銀）將 Micron 目標價從 $535 大幅調升至 $1,625，並預期股價有翻倍空間。受 AI 記憶體（HBM）極度供不應求推動，今日股價暴漲逾 19%，帶領半導體板塊集體狂飆。 |
+| **MSFT** (Microsoft) | **LONG** (長倉) | AI 業務年化收入達 370 億美元，估值回調提供買入點 | **MED** (中) | 雖然今日微軟微跌 0.6%，但其 AI 催化劑依然強勁。股價從歷史高位回落後提供技術性吸納機會，且新任聯儲局主席 Kevin Warsh 上任，市場對估值修復持樂觀態度。 |
+| **XOM** (Exxon Mobil) | **SHORT** (短倉) | 美伊和談預期升溫，國際油價持續走低 | **MED** (中) | 特朗普表示美伊談判「進展順利」，市場預期霍爾木茲海峽有望重新開放，WTI 原油價格跌至每桶 92 美元附近。原油供應增加預期拖累能源板塊，Exxon Mobil 今日大跌 3.3%。 |
+
+---
+
+## ⚠️ 風險警示
+* **今日要避開嘅板塊：能源板塊 (Energy Sector)** 
+  * **原因**：地緣政治出現緩和曙光（美伊和談進展順利），導致國際油價（WTI）持續回落，今日 Exxon Mobil 等能源巨頭領跌 S&P 500。在和談達成最終協議前，原油及相關股票波動極大，建議暫時避開。
+* **關鍵風險事件**：**聯儲局新主席 Kevin Warsh 首周上任與通脹數據**
+  * **原因**：本周是 Kevin Warsh 正式接任聯儲局主席的第一周，市場高度關注其政策風格（尤其是聯儲局縮表計劃）。同時，本周即將公佈的 PCE 物價指數和 GDP 數據將直接考驗市場對「高利率維持更久（Higher for longer）」的承受力。
+
+---
+
+## 📊 市場情緒
+* **整體 Risk-on/off 判斷**：**Risk-on (偏向冒險)**
+  * **原因**：美股在陣亡將士紀念日假期後復市，標普 500 指數（+0.6%）與納斯達克指數（+1.2%）雙雙創下歷史新高。市場受到美伊和談進展及 AI 晶片熱潮（由美光萬億市值里程碑帶動）的雙重利好推動，市場情緒極為亢奮。
+* **最強板塊**：**科技與半導體板塊 (Technology & Semiconductors)**
+  * 受 Micron 暴漲 19% 帶動，費城半導體指數創歷史新高，科技股（如 Alphabet +1.4%、Broadcom +1.9%）成為今日升市火車頭。
+* **最弱板塊**：**能源與防守性消費板塊 (Energy & Consumer Staples)**
+  * 油價下跌重創能源股（XOM -3.3%），而資金轉向科技股亦令防守性板塊（如 Walmart -1.4%）遭到資金流出。
+
+📎 Sources:
+- tradingeconomics.com: https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQEk-PBOGvxbPDwBReJJQqSbbWCZG5PXS
+- tradingkey.com: https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQH7O0v8Y4yUwAn4WvePACINQij7Hae5W
+- bnnbloomberg.ca: https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQE4NHv4zkK5pys5tgj2Ht4yiItVRIqsx
+- theedgesingapore.com: https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQH2FYV3eqDzjjaVUsOlqQuuyDbdfw6HD
+- investing.com: https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQH-s8UHbPX29kMn7P7xDZmXJ4z4ToRgU
+
+
+## 📐 Trading Setups
+
+| Ticker | 方向 | Entry | SL | TP | RR | ATR | Trend | 來源 |
+|:--|:--|--:|--:|--:|--:|--:|:--|:--|
+| **MU** | LONG | $895.88 | $796.57 | $1,094.50 | 2.0 | $66.20 | 📈 上升 | YF calc |
+| **MSFT** | LONG | $416.03 | $399.87 | $448.36 | 2.0 | $10.77 | 📈 上升 | YF calc |
+| **XOM** | LONG | $149.81 | $147.90 | $162.33 | 6.5 | $4.17 | 📈 上升 | Screener |
+
+> **Screener** = technical screener 計算 | **YF calc** = 快速 yfinance ATR-based (1.5x SL / 3x TP)
+> ⚠️ YF calc setups 係粗略估算，建議人手確認先落單

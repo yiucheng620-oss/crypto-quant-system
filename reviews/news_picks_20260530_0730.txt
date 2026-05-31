@@ -1,0 +1,43 @@
+## 🔥 新聞驅動推薦
+
+| TICKER | 方向 | Catalyst (催化劑) | 信心 | 原因 |
+| :--- | :--- | :--- | :--- | :--- |
+| **DELL** | **LONG (看多)** | Q1 業績與指引爆發 | **HIGH (高)** | Dell 今日股價瘋狂暴漲約 33%。其 AI 伺服器需求呈現現象級增長（AI 伺服器收入季增 757% 至 161 億美元），公司大幅上調全年營收指引。這證明 AI 基礎設施的變現能力已從晶片端（NVDA）強烈傳導至硬體伺服器端，短期多頭動能極強。 |
+| **COST** | **SHORT (看空)** | 財報後估值修正 | **MED (中)** | Costco 公布的 Q3 財報雖然營收與獲利均實現雙位數增長，但股價今日卻逆市下跌超過 4%。主因是市場認為其接近 50 倍的遠期本益比（P/E）過於昂貴，增長速度無法支撐如此高昂的估值溢價。財報利多出盡後，短期面臨獲利回吐與估值修正壓力。 |
+| **NOW** | **LONG (看多)** | AI 軟體生態鏈外溢效應 | **MED (中)** | 隨著 Dell 的強勁財報重燃市場對整個 AI 生態鏈的信心，資金開始尋找「非晶片/非硬體」的 AI 受益者。ServiceNow（NOW）今日股價大幅飆升近 14%，顯示市場資金正加速流入能將 AI 應用落地並變現的優質企業級軟體板塊。 |
+
+---
+
+## ⚠️ 風險警示
+* **要避開的板塊：民生必需品（Consumer Staples）與傳統零售**
+  * **原因**：今日大盤維持強勢，但 Costco（COST）財報後的下挫拖累了整體防禦性板塊。在強烈的 Risk-on 情緒下，資金正從高估值的防禦性消費股中抽離，轉而追逐科技股。短期內應規避估值偏高的零售巨頭。
+* **宏觀政治不確定性**
+  * **原因**：雖然美伊停火談判與核協議談判進展順利（初步同意延長停火60天），推動了近期地緣政治風險溢價回落，但美國總統川普尚未正式簽署同意，地緣政治局勢仍存在隨時逆轉的尾部風險。
+
+---
+
+## 📊 市場情緒
+* **整體情緒判斷**：**極度 Risk-on（冒險意願高漲）**
+  * S&P 500 指數創下連續第 9 週上漲的歷史性紀錄，美伊和平協議的樂觀預期加上 AI 基礎設施需求的持續井噴，令市場多頭情緒無懈可擊。
+* **最強板塊**：**科技與硬體設備（Technology & Hardware）**、**企業級軟體（Enterprise Software）**。
+* **最弱板塊**：**民生防禦性板塊（Consumer Defensive/Staples）**、**能源（Energy，受油價回落至 $87 附近拖累）**。
+
+📎 Sources:
+- theedgesingapore.com: https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQF86JYiRvWwCT2bNo4XbNllen_shDh4f
+- fool.com: https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQEMFrAZdA1COlrviErQ6Rp3v9adw1WHy
+- swissinfo.ch: https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQH_GICu-cRseg03NZxY839wsJONsTFcK
+- ft.com: https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQGrjcdSJxCKLQ-p7XLQE6spQPp5H51WU
+- costco.com: https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQF5N4a42Ye04eCwYUNhgTBVBrXnIddfA
+
+
+## 📐 Trading Setups
+
+| Ticker | 方向 | Entry | SL | TP | RR | ATR | Trend | 來源 |
+|:--|:--|--:|--:|--:|--:|--:|:--|:--|
+| **DELL** | LONG | $420.91 | $395.00 | $500.00 | 3.0 | $0.00 | ? | Screener |
+| **NVDA** | LONG | $211.14 | $195.00 | $250.00 | 2.4 | $0.00 | ? | Screener |
+| **COST** | LONG | $956.32 | $917.02 | $1,034.93 | 2.0 | $26.24 | 📉 下降 | YF calc |
+| **NOW** | LONG | $124.37 | $114.22 | $144.67 | 2.0 | $6.76 | 📈 上升 | YF calc |
+
+> **Screener** = technical screener 計算 | **YF calc** = 快速 yfinance ATR-based (1.5x SL / 3x TP)
+> ⚠️ YF calc setups 係粗略估算，建議人手確認先落單
